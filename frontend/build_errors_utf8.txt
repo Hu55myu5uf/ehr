@@ -1,0 +1,11 @@
+﻿
+> frontend@1.0.0 build
+> tsc && vite build
+
+src/pages/Billing.tsx(552,34): error TS2304: Cannot find name 'X'.
+src/pages/Laboratory.tsx(694,34): error TS2304: Cannot find name 'XCircle'.
+src/pages/Laboratory.tsx(809,34): error TS2304: Cannot find name 'XCircle'.
+src/pages/UserManagement.tsx(107,25): error TS2345: Argument of type '{ username: string; full_name: string; email: string; password: string; confirmPassword: string; role: string; is_active: true; }' is not assignable to parameter of type 'SetStateAction<{ username: string; full_name: string; email: string; password: string; confirmPassword: string; role: string; specialty: string; is_active: boolean; }>'.
+  Property 'specialty' is missing in type '{ username: string; full_name: string; email: string; password: string; confirmPassword: string; role: string; is_active: true; }' but required in type '{ username: string; full_name: string; email: string; password: string; confirmPassword: string; role: string; specialty: string; is_active: boolean; }'.
+src/pages/WardDetails.tsx(264,64): error TS2339: Property 'admission_id' does not exist on type 'Bed'.
+src/pages/WardDetails.tsx(264,108): error TS2339: Property 'admission_id' does not exist on type 'Bed'.

@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+/* Brand color palette for Tailwind v4 */
+@theme {
+  --color-brand-50: #f0f9ff;
+  --color-brand-100: #e0f2fe;
+  --color-brand-200: #bae6fd;
+  --color-brand-300: #7dd3fc;
+  --color-brand-400: #38bdf8;
+  --color-brand-500: #0ea5e9;
+  --color-brand-600: #0284c7;
+  --color-brand-700: #0369a1;
+  --color-brand-800: #075985;
+  --color-brand-900: #0c4a6e;
+}
+
+/* Enable class-based dark mode for Tailwind v4 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.4; /* Slightly tighter line height */
+  font-weight: 400;
+  font-size: 13px; /* Reduced base font size for higher density */
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Light mode defaults */
+:root:not(.dark) {
+  color-scheme: light;
+  color: #0f172a; /* Darker text for better contrast */
+  background-color: #f1f5f9; /* Slightly more tinted background */
+}
+
+/* Dark mode */
+.dark {
+  color-scheme: dark;
+  color: rgba(255, 255, 255, 0.87);
+  background-color: #0f172a;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Custom Scrollbar Utilities */
+.scrollbar-slim::-webkit-scrollbar {
+  width: 3px;
+}
+.scrollbar-slim::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-slim::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 20px;
+}
+.dark .scrollbar-slim::-webkit-scrollbar-thumb {
+  background-color: #334155;
+}
+.scrollbar-slim {
+  scrollbar-width: thin;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Glass-morphism & Premium UI Utilities */
+.glass-effect {
+  @apply bg-white/70 dark:bg-slate-900/40 backdrop-blur-md border border-white/20 dark:border-slate-800/50;
+}
+
+.premium-card {
+  @apply bg-white dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 rounded-[2rem] shadow-sm hover:shadow-xl hover:shadow-brand-500/5 hover:border-brand-500/30 transition-all duration-300;
+}
+
+.premium-input {
+  @apply bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2 text-sm text-slate-900 dark:text-white outline-none focus:border-brand-500 focus:ring-4 focus:ring-brand-500/5 transition-all;
+}
+
+.text-dense {
+  @apply text-[11px] font-bold uppercase tracking-widest leading-none;
+}
+
+.btn-premium {
+  @apply flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-500 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-brand-600/20 active:scale-95 disabled:opacity-50;
+}

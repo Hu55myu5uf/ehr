@@ -1,0 +1,59 @@
+{
+    "system_name": "ViiSec EHR",
+    "modules": {
+        "admissions": {
+            "description": "Inpatient management and monitoring.",
+            "workflows": [
+                "Assigning patients to wards and beds.",
+                "Managing medication administration via the Treatment Sheet (MAR).",
+                "Recording vitals and fluid intake/output.",
+                "Patient discharge process."
+            ]
+        },
+        "consultations": {
+            "description": "Outpatient clinical documentation and ordering.",
+            "workflows": [
+                "Recording chief complaints and history.",
+                "Performing Review of Systems (ROS).",
+                "Using Digital Scribe for handwriting notes.",
+                "Diagnosing using ICD-10 search.",
+                "Ordering laboratory tests and prescribing medications."
+            ]
+        },
+        "pharmacy": {
+            "description": "Drug inventory and dispensing.",
+            "workflows": [
+                "Dispensing medications to patients from the queue.",
+                "Batch dispensing for multiple prescriptions.",
+                "Monitoring inventory levels and managing drug stock.",
+                "Tracking dispensing history."
+            ]
+        },
+        "laboratory": {
+            "description": "Lab investigation management.",
+            "workflows": [
+                "Processing lab orders from clinicians.",
+                "Specimen collection and result entry.",
+                "Invoicing for unpaid lab tests.",
+                "Viewing investigation history."
+            ]
+        },
+        "billing": {
+            "description": "Financial management and insurance.",
+            "workflows": [
+                "Generating automated bills from encounters.",
+                "Splitting costs between patients and insurance providers.",
+                "Processing payments and issuing receipts.",
+                "Managing the hospital price list."
+            ]
+        },
+        "admin": {
+            "description": "System configuration and user management.",
+            "workflows": [
+                "Registering and managing user accounts and roles.",
+                "Configuring global system settings like hospital name and timeouts.",
+                "Generating comprehensive hospital reports."
+            ]
+        }
+    }
+}

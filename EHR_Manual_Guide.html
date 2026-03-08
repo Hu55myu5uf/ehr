@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>EHR System — Manual Guide</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', sans-serif; color: #1e293b; line-height: 1.7; padding: 40px 60px; max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 28px; font-weight: 800; color: #0f172a; margin-bottom: 6px; }
+  h2 { font-size: 20px; font-weight: 700; color: #1e40af; margin-top: 36px; margin-bottom: 12px; border-bottom: 2px solid #dbeafe; padding-bottom: 6px; }
+  h3 { font-size: 15px; font-weight: 700; color: #334155; margin-top: 20px; margin-bottom: 8px; }
+  p, li { font-size: 13px; }
+  ol, ul { padding-left: 22px; margin-bottom: 10px; }
+  li { margin-bottom: 4px; }
+  code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 12px; font-family: 'Consolas', monospace; color: #0f172a; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 14px 18px; border-radius: 8px; font-size: 12px; font-family: 'Consolas', monospace; margin: 10px 0 16px; overflow-x: auto; white-space: pre-wrap; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px; font-size: 12px; }
+  th { background: #1e40af; color: white; padding: 8px 12px; text-align: left; font-weight: 600; }
+  td { padding: 7px 12px; border-bottom: 1px solid #e2e8f0; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .subtitle { font-size: 14px; color: #64748b; margin-bottom: 30px; }
+  .check { color: #16a34a; font-weight: 700; }
+  .badge { display: inline-block; background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .note { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; border-radius: 0 6px 6px 0; font-size: 12px; margin: 12px 0; }
+  .page-break { page-break-before: always; }
+  hr { border: none; border-top: 1px solid #e2e8f0; margin: 30px 0; }
+  @media print {
+    body { padding: 20px 30px; }
+    h2 { page-break-after: avoid; }
+    .page-break { page-break-before: always; }
+  }
+</style>
+</head>
+<body>
+
+<h1>EHR System — Manual Guide</h1>
+<p class="subtitle">Setup Instructions & Testing Walkthrough</p>
+
+<!-- ============================================ -->
+<h2>Part A: Application Setup & Startup</h2>
+<!-- ============================================ -->
+
+<h3>Step 1 — Start XAMPP Services</h3>
+<ol>
+  <li>Open <strong>XAMPP Control Panel</strong></li>
+  <li>Click <strong>Start</strong> next to <strong>Apache</strong></li>
+  <li>Click <strong>Start</strong> next to <strong>MySQL</strong></li>
+  <li>Both should show green "Running" status</li>
+</ol>
+
+<h3>Step 2 — Run Database Migrations</h3>
+<p>Open PowerShell and run:</p>
+<pre>Get-Content c:\xampp\htdocs\ehr\database\schema.sql | c:\xampp\mysql\bin\mysql.exe -u root
+
+Get-Content c:\xampp\htdocs\ehr\database\migration_clinical_workflow.sql | c:\xampp\mysql\bin\mysql.exe -u root</pre>
+
+<h3>Step 3 — Install Backend Dependencies</h3>
+<pre>cd c:\xampp\htdocs\ehr\backend
+composer install</pre>
+
+<h3>Step 4 — Configure Backend Environment</h3>
+<p>Ensure <code>c:\xampp\htdocs\ehr\backend\.env</code> contains:</p>
+<pre>DB_HOST=localhost
+DB_NAME=ehrecords
+DB_USER=root
+DB_PASS=
+JWT_SECRET=&lt;your-secret-key&gt;
+APP_DEBUG=true</pre>
+
+<h3>Step 5 — Install Frontend Dependencies</h3>
+<pre>cd c:\xampp\htdocs\ehr\frontend
+npm install</pre>
+
+<h3>Step 6 — Start the Frontend Dev Server</h3>
+<pre>cd c:\xampp\htdocs\ehr\frontend
+npm run dev</pre>
+
+<h3>Step 7 — Open the Application</h3>
+<ol>
+  <li>Open your browser and navigate to <code>http://localhost:5173</code></li>
+  <li>Login as <strong>admin@ehr</strong> with your admin password</li>
+</ol>
+
+<h3>Services Reference</h3>
+<table>
+  <tr><th>Service</th><th>URL</th><th>How to Start</th></tr>
+  <tr><td>MySQL</td><td><code>localhost:3306</code></td><td>XAMPP → Start MySQL</td></tr>
+  <tr><td>Apache (Backend API)</td><td><code>localhost/ehr/backend/public/</code></td><td>XAMPP → Start Apache</td></tr>
+  <tr><td>Frontend</td><td><code>localhost:5173</code></td><td><code>npm run dev</code> in frontend/</td></tr>
+</table>
+
+<div class="note">
+  <strong>Note:</strong> Apache serves the PHP backend API via XAMPP. The frontend Vite dev server proxies API calls to it. Both must be running simultaneously.
+</div>
+
+<!-- ============================================ -->
+<div class="page-break"></div>
+<h2>Part B: Manual Testing Guide</h2>
+<!-- ============================================ -->
+
+<!-- Phase 1 -->
+<h3>Phase 1 — Super Admin Login & User Creation</h3>
+<p><strong>1.1 Login as Super Admin</strong></p>
+<ol>
+  <li>Navigate to <code>/login</code></li>
+  <li>Enter username: <strong>admin@ehr</strong>, password: your admin password</li>
+  <li>Complete MFA if prompted</li>
+  <li><span class="check">✅ Verify:</span> Dashboard shows "Admin Dashboard" title with all 6 KPI cards</li>
+</ol>
+
+<p><strong>1.2 Create User Accounts</strong></p>
+<p>Go to <strong>User Management</strong> (<code>/admin/users</code>) and create:</p>
+<table>
+  <tr><th>Username</th><th>Role</th><th>Password</th></tr>
+  <tr><td><code>doctor1</code></td><td>Doctor</td><td>(your choice)</td></tr>
+  <tr><td><code>nurse1</code></td><td>Nurse</td><td>(your choice)</td></tr>
+  <tr><td><code>receptionist1</code></td><td>Receptionist</td><td>(your choice)</td></tr>
+  <tr><td><code>labtech1</code></td><td>Lab Attendant</td><td>(your choice)</td></tr>
+  <tr><td><code>pharmacist1</code></td><td>Pharmacist</td><td>(your choice)</td></tr>
+</table>
+<p><span class="check">✅ Verify:</span> All 5 users appear in the user list</p>
+
+<hr>
+
+<!-- Phase 2 -->
+<h3>Phase 2 — Receptionist Workflow</h3>
+<p><strong>2.1 Login as Receptionist</strong></p>
+<ol>
+  <li>Log out, log in as <code>receptionist1</code></li>
+  <li><span class="check">✅ Verify:</span> Sidebar shows only: Dashboard, Patients, Appointments, Billing</li>
+  <li><span class="check">✅ Verify:</span> Dashboard shows "Reception Desk" title</li>
+</ol>
+
+<p><strong>2.2 Register a New Patient</strong></p>
+<ol>
+  <li>Go to <strong>Patients</strong> → click <strong>Register Patient</strong></li>
+  <li>Fill in: first name, last name, DOB, gender, phone, next of kin details</li>
+  <li>Submit the form</li>
+  <li><span class="check">✅ Verify:</span> Patient appears with auto-generated MRN</li>
+</ol>
+
+<p><strong>2.3 Book an Appointment</strong></p>
+<ol>
+  <li>Go to <strong>Appointments</strong> → click <strong>Book Appointment</strong></li>
+  <li>Search and select the patient, set today's date, choose time and type</li>
+  <li>Add a reason (e.g. "Fever and headache"), click <strong>Book Appointment</strong></li>
+  <li><span class="check">✅ Verify:</span> Appointment appears with status "Scheduled"</li>
+</ol>
+
+<p><strong>2.4 Check In the Patient</strong></p>
+<ol>
+  <li>Hover over the appointment → click <strong>Check In</strong></li>
+  <li><span class="check">✅ Verify:</span> Status changes to "Checked In"</li>
+</ol>
+
+<hr>
+
+<!-- Phase 3 -->
+<h3>Phase 3 — Doctor Workflow</h3>
+<p><strong>3.1 Login as Doctor</strong></p>
+<ol>
+  <li>Log out, log in as <code>doctor1</code></li>
+  <li><span class="check">✅ Verify:</span> Sidebar shows: Dashboard, Patients, Appointments, Consultations, Laboratory, ICU</li>
+</ol>
+
+<p><strong>3.2 Start a Consultation</strong></p>
+<ol>
+  <li>Go to <strong>Encounters</strong> → click <strong>Start Consultation</strong></li>
+  <li>Search for the patient, fill in type and chief complaint, submit</li>
+  <li><span class="check">✅ Verify:</span> Encounter appears in the list</li>
+</ol>
+
+<p><strong>3.3 Fill the Consultation Form</strong></p>
+<ol>
+  <li>Go to <strong>Consultations</strong> → click the encounter</li>
+  <li>Fill each section:
+    <ul>
+      <li><strong>Patient's Complaint</strong> — chief complaint and HPI</li>
+      <li><strong>Review of Systems</strong> — check relevant organ systems</li>
+      <li><strong>Past Medical / Drug / Family / Social History</strong></li>
+      <li><strong>Diagnosis</strong> — primary diagnosis + ICD code (e.g. "Malaria", "B54")</li>
+      <li><strong>Treatment Plan</strong> — admission decision, nursing instructions</li>
+    </ul>
+  </li>
+  <li>Click <strong>Save</strong></li>
+  <li><span class="check">✅ Verify:</span> "Saved successfully" message appears</li>
+</ol>
+
+<p><strong>3.4 Order Lab Tests (inline)</strong></p>
+<ol>
+  <li>In the <strong>Lab Orders</strong> section, type test name (e.g. "Full Blood Count")</li>
+  <li>Select priority, click <strong>Order</strong></li>
+  <li><span class="check">✅ Verify:</span> Test appears with status "ordered"</li>
+</ol>
+
+<p><strong>3.5 Prescribe Medications (inline)</strong></p>
+<ol>
+  <li>In the <strong>Medications</strong> section, enter name, dosage, frequency</li>
+  <li>Select route, click <strong>Prescribe</strong></li>
+  <li><span class="check">✅ Verify:</span> Medication appears with status "pending"</li>
+</ol>
+
+<p><strong>3.6 Complete Consultation</strong></p>
+<ol>
+  <li>Click <strong>Complete</strong> → confirm the dialog</li>
+  <li><span class="check">✅ Verify:</span> Encounter shows "Completed"; bill is auto-generated</li>
+</ol>
+
+<hr>
+
+<!-- Phase 4 -->
+<h3>Phase 4 — Nurse Workflow</h3>
+<ol>
+  <li>Log out, log in as <code>nurse1</code></li>
+  <li><span class="check">✅ Verify:</span> Sidebar shows: Dashboard, Patients, Nursing, ICU</li>
+  <li>Go to <strong>Nursing</strong> → select the patient</li>
+  <li><span class="check">✅ Verify:</span> Doctor's nursing instructions appear</li>
+  <li>Click <strong>Record Vitals</strong> → fill in Temperature, BP, HR, SpO₂, etc. → Save</li>
+  <li>Click <strong>Add Note</strong> → enter care note → Save</li>
+  <li><span class="check">✅ Verify:</span> Both appear in the timeline</li>
+</ol>
+
+<hr>
+
+<!-- Phase 5 -->
+<h3>Phase 5 — Lab Technician Workflow</h3>
+<ol>
+  <li>Log out, log in as <code>labtech1</code></li>
+  <li><span class="check">✅ Verify:</span> Sidebar shows: Dashboard, Laboratory</li>
+  <li>Go to <strong>Laboratory</strong> → find the pending order</li>
+  <li>Update status to "In Progress", add results, mark "Completed"</li>
+  <li><span class="check">✅ Verify:</span> Result values display correctly</li>
+</ol>
+
+<hr>
+
+<!-- Phase 6 -->
+<h3>Phase 6 — Pharmacist Workflow</h3>
+<ol>
+  <li>Log out, log in as <code>pharmacist1</code></li>
+  <li><span class="check">✅ Verify:</span> Sidebar shows: Dashboard, Pharmacy</li>
+  <li>Go to <strong>Pharmacy</strong> → find pending prescriptions</li>
+  <li>Click <strong>Dispense</strong> on each medication</li>
+  <li><span class="check">✅ Verify:</span> Status changes to "Dispensed"</li>
+</ol>
+
+<hr>
+
+<!-- Phase 7 -->
+<h3>Phase 7 — Billing & Payment (Receptionist)</h3>
+<ol>
+  <li>Log out, log in as <code>receptionist1</code></li>
+  <li>Go to <strong>Billing</strong> → click the pending bill</li>
+  <li><span class="check">✅ Verify:</span> Itemized list shows consultation fee (₦5,000), lab tests (₦2,500 each), medications (₦1,500 each)</li>
+  <li>Click <strong>Process Payment</strong> → enter amount, select method → Confirm</li>
+  <li><span class="check">✅ Verify:</span> Bill status changes to "Paid"</li>
+</ol>
+
+<hr>
+
+<!-- Phase 8 -->
+<h3>Phase 8 — Super Admin Verification</h3>
+<ol>
+  <li>Log in as <code>admin@ehr</code></li>
+  <li><span class="check">✅ Verify:</span> All 11 sidebar items visible</li>
+  <li><span class="check">✅ Verify:</span> Can access every module</li>
+  <li>Go to <strong>User Management</strong> → try suspending and reactivating a user</li>
+</ol>
+
+<hr>
+
+<!-- Summary -->
+<div class="page-break"></div>
+<h2>Quick Checklist Summary</h2>
+<table>
+  <tr><th>#</th><th>Action</th><th>Expected Result</th></tr>
+  <tr><td>1</td><td>Admin login</td><td>All features visible</td></tr>
+  <tr><td>2</td><td>Create 5 users</td><td>Users appear in list</td></tr>
+  <tr><td>3</td><td>Register patient</td><td>MRN auto-generated</td></tr>
+  <tr><td>4</td><td>Book appointment</td><td>Shows in today's queue</td></tr>
+  <tr><td>5</td><td>Check in patient</td><td>Status → Checked In</td></tr>
+  <tr><td>6</td><td>Create encounter</td><td>Encounter in list</td></tr>
+  <tr><td>7</td><td>Fill consultation form</td><td>All sections save</td></tr>
+  <tr><td>8</td><td>Order lab tests</td><td>Tests appear inline</td></tr>
+  <tr><td>9</td><td>Prescribe medications</td><td>Meds appear inline</td></tr>
+  <tr><td>10</td><td>Complete consultation</td><td>Bill auto-generated</td></tr>
+  <tr><td>11</td><td>Record vitals</td><td>Vitals in timeline</td></tr>
+  <tr><td>12</td><td>Add care note</td><td>Note in timeline</td></tr>
+  <tr><td>13</td><td>Process lab results</td><td>Results recorded</td></tr>
+  <tr><td>14</td><td>Dispense medications</td><td>Status → Dispensed</td></tr>
+  <tr><td>15</td><td>Pay bill</td><td>Status → Paid</td></tr>
+</table>
+
+</body>
+</html>

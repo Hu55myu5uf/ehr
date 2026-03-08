@@ -1,0 +1,50 @@
+{
+    "name": "hms/ehr-backend",
+    "version": "1.0.0",
+    "description": "HIPAA-Compliant Electronic Health Record System - Backend API",
+    "type": "project",
+    "license": "proprietary",
+    "require": {
+        "php": "^8.2",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "ext-openssl": "*",
+        "ext-pdo": "*",
+        "firebase/php-jwt": "^6.10",
+        "pragmarx/google2fa": "^8.0",
+        "ramsey/uuid": "^4.7",
+        "respect/validation": "^2.3",
+        "vlucas/phpdotenv": "^5.6"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5",
+        "squizlabs/php_codesniffer": "^3.8"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "test:coverage": "phpunit --coverage-html coverage",
+        "cs": "phpcs --standard=PSR12 src/",
+        "cs:fix": "phpcbf --standard=PSR12 src/"
+    },
+    "config": {
+        "process-timeout": 2000,
+        "optimize-autoloader": true,
+        "preferred-install": "dist",
+        "sort-packages": true,
+        "audit": {
+            "ignore": [
+                "PKSA-y2cr-5h3j-g3ys"
+            ]
+        }
+    }
+}

@@ -1,0 +1,31 @@
+# System Files
+.DS_Store
+Thumbs.db
+*.log
+*.cache
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Backend
+backend/.env
+backend/vendor/
+backend/test_*.php
+backend/php_output.txt
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+
+# Database backups
+database/*.sql.gz
+database/*.sql.bak
+
+# Temp
+tmp/
+coverage/
+    
