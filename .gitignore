@@ -12,8 +12,17 @@ Thumbs.db
 # Backend
 backend/.env
 backend/vendor/
+backend/cache/
 backend/test_*.php
 backend/php_output.txt
+backend/check_*.php
+backend/fix_*.php
+backend/migrate_*.php
+backend/debug_*.php
+backend/list_*.php
+backend/composer.phar
+backend/*.txt
+backend/*.log
 
 # Frontend
 frontend/node_modules/

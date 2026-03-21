@@ -1,0 +1,42 @@
+# Composer dependencies
+/vendor/
+composer.phar
+
+# Environment files
+.env
+
+# Cache
+/cache/
+*.cache
+
+# Logs
+*.log
+upload_debug.log
+
+# Temporary debug/migration scripts (optional - remove if you want to track these)
+check_db.php
+check_insurance_schema.php
+check_perms.php
+check_tables.php
+debug_bill.php
+fix_categories.php
+fix_db_final.php
+list_tables.php
+migrate_insurance.php
+migrate_monitoring.php
+migrate_settings.php
+migrate_wallet.php
+test_batch.php
+test_billing.php
+test_new_apis.php
+test_path.php
+test_pending.php
+test_prices.php
+tables_info.txt
+roles.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
