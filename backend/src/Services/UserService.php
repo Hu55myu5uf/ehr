@@ -522,10 +522,11 @@ class UserService
                     if (!empty($user['full_name'])) {
                         $parts = explode(' ', trim($user['full_name']));
                         $firstName = $parts[0];
-                        $lastName = count($parts) > 1 ? implode(' ', array_slice($parts, 1)) : 'Provider';
+                        $lastName = count($parts) > 1 ? implode(' ', array_slice($parts, 1)) : '';
                     } else {
                         $nameParts = explode('@', $username);
                         $firstName = ucfirst($nameParts[0]);
+                        $lastName = '';
                     }
 
                     $insert = $this->db->prepare("
@@ -571,7 +572,7 @@ class UserService
         try {
             $parts = explode(' ', trim($fullName));
             $firstName = $parts[0];
-            $lastName = count($parts) > 1 ? implode(' ', array_slice($parts, 1)) : 'Provider';
+            $lastName = count($parts) > 1 ? implode(' ', array_slice($parts, 1)) : '';
 
             $stmt = $this->db->prepare("
                 UPDATE providers 

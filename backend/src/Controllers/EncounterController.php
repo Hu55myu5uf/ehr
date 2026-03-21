@@ -188,6 +188,37 @@ class EncounterController
     }
 
 
+    /**
+     * Create atomic walk-in patient + encounter
+     * POST /api/encounters/walk-in
+     */
+    public function createWalkIn(object $user): void
+    {
+        try {
+            AuthMiddleware::requireRole($user, \App\Config\Roles::CAN_CREATE_ENCOUNTERS);
+
+            $data = json_decode(file_get_contents('php://input'), true);
+
+            // Get provider ID from user
+            $providerId = $this->providerService->getProviderIdByUserId($user->sub);
+
+            if (!$providerId) {
+                $this->error('Provider not found for user', 403);
+                return;
+            }
+
+            $encounter = $this->encounterService->createWalkInEncounter($data, $providerId);
+
+            // Log audit trail
+            $this->audit->logRequest($user, $encounter['patient_id']);
+
+            $this->success($encounter, 201);
+
+        } catch (\Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
     // Response helpers
     private function success(array $data, int $code = 200): void
     {

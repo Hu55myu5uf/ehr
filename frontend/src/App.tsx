@@ -25,6 +25,8 @@ import Admissions from './pages/Admissions'
 import PriceManagement from './pages/PriceManagement'
 import FundsStatistics from './pages/FundsStatistics'
 import Insurance from './pages/Insurance'
+import EmbeddedResource from './pages/EmbeddedResource'
+import AuditLogs from './pages/AuditLogs'
 
 const AdmissionWrapper = () => {
     const { id } = useParams();
@@ -59,6 +61,7 @@ function App() {
                         <Route path="/dashboard" element={<Dashboard />} />
                         <Route path="/patients" element={<PatientDashboard />} />
                         <Route path="/patients/register" element={<RegisterPatient />} />
+                        <Route path="/patients/edit/:id" element={<RegisterPatient />} />
                         <Route path="/patients/:id" element={<PatientDetail />} />
                         <Route path="/encounters" element={<Encounters />} />
                         <Route path="/appointments" element={<Appointments />} />
@@ -87,10 +90,17 @@ function App() {
                             <Route path="/admin/prices" element={<PriceManagement />} />
                             <Route path="/admin/funds" element={<FundsStatistics />} />
                             <Route path="/admin/users" element={<UserManagement />} />
+                            <Route path="/admin/logs" element={<AuditLogs />} />
                         </Route>
 
                         <Route element={<ProtectedRoute allowedRoles={['super_admin', 'billing_officer']} />}>
                             <Route path="/insurance" element={<Insurance />} />
+                        </Route>
+
+                        {/* External Resources embedded */}
+                        <Route element={<ProtectedRoute allowedRoles={['super_admin', 'doctor', 'pharmacist']} />}>
+                            <Route path="/resources/calc" element={<EmbeddedResource />} />
+                            <Route path="/resources/emdex" element={<EmbeddedResource />} />
                         </Route>
 
                         <Route path="/settings" element={<Settings />} />

@@ -114,7 +114,7 @@ export default function Settings() {
 
         try {
             setSaving(true);
-            const res = await api.post('/api/users/profile-picture', formData, {
+            const res = await api.post('/users/profile-picture', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
             const newPic = res.data.profile_picture;
@@ -164,7 +164,7 @@ export default function Settings() {
         <div className="space-y-8 animate-in fade-in duration-500">
             {/* Header */}
             <div>
-                <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Settings</h1>
+                <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Profile Settings</h1>
                 <p className="text-slate-500 dark:text-slate-400 mt-1">Manage your account preferences and security</p>
             </div>
 
@@ -184,7 +184,7 @@ export default function Settings() {
                         <div className="text-center p-6 pb-4">
                             <div className="w-16 h-16 rounded-full bg-brand-500/10 flex items-center justify-center text-brand-500 font-bold text-2xl mx-auto mb-3 overflow-hidden">
                                 {profileData.profile_picture ? (
-                                    <img src={`http://localhost:5173/api/uploads/profiles/${profileData.profile_picture}`} alt="" className="w-full h-full object-cover" />
+                                    <img src={`/uploads/profiles/${profileData.profile_picture}`} alt="" className="w-full h-full object-cover" />
                                 ) : (
                                     (profileData.full_name || currentUser.username).charAt(0).toUpperCase()
                                 )}
@@ -227,7 +227,7 @@ export default function Settings() {
                                     <div className="relative group">
                                         <div className="w-24 h-24 rounded-3xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-brand-500 text-3xl font-bold overflow-hidden border-2 border-slate-200 dark:border-slate-700">
                                             {profileData.profile_picture ? (
-                                                <img src={`http://localhost:5173/api/uploads/profiles/${profileData.profile_picture}`} alt="" className="w-full h-full object-cover" />
+                                                <img src={`/uploads/profiles/${profileData.profile_picture}`} alt="" className="w-full h-full object-cover" />
                                             ) : (
                                                 (profileData.full_name || profileData.username).charAt(0).toUpperCase()
                                             )}

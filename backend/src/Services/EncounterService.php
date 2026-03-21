@@ -213,7 +213,9 @@ class EncounterService
             LIMIT :limit
         ");
         
-        $stmt->execute(['patient_id' => $patientId, 'limit' => $limit]);
+        $stmt->bindValue('patient_id', $patientId);
+        $stmt->bindValue('limit', $limit, \PDO::PARAM_INT);
+        $stmt->execute();
         
         return $stmt->fetchAll();
     }
@@ -344,5 +346,19 @@ class EncounterService
             'allergies' => $allergies,
             'diagnoses' => $diagnoses
         ];
+    }
+    /**
+     * Create a new encounter for a walk-in patient (atomic patient + encounter creation is handled by controller/frontend calling sequentially, but this helper simplifies it if needed)
+     */
+    public function createWalkInEncounter(array $patientData, string $providerId): array
+    {
+        $patientService = new PatientService();
+        $patient = $patientService->registerWalkIn($patientData);
+        
+        return $this->createEncounter([
+            'patient_id' => $patient['id'],
+            'encounter_type' => 'walk_in',
+            'chief_complaint' => 'Immediate walk-in consultation/order'
+        ], $providerId);
     }
 }

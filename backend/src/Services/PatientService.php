@@ -42,12 +42,12 @@ class PatientService
                     nin, phone, email, address_line1, address_line2, city, state, zip_code,
                     country, emergency_contact_name, emergency_contact_phone, 
                     emergency_contact_relationship, primary_language,
-                    race, ethnicity, marital_status
+                    race, ethnicity, marital_status, profile_picture
                 ) VALUES (
                     :id, :mrn, :first_name, :middle_name, :last_name, :dob, :gender,
                     :nin, :phone, :email, :address1, :address2, :city, :state, :zip,
                     :country, :emergency_name, :emergency_phone, :emergency_relationship,
-                    :language, :race, :ethnicity, :marital_status
+                    :language, :race, :ethnicity, :marital_status, :profile_picture
                 )
             ");
 
@@ -74,7 +74,8 @@ class PatientService
                 'language' => $data['primary_language'] ?? 'English',
                 'race' => $data['race'] ?? null,
                 'ethnicity' => $data['ethnicity'] ?? null,
-                'marital_status' => $data['marital_status'] ?? null
+                'marital_status' => $data['marital_status'] ?? null,
+                'profile_picture' => $data['profile_picture'] ?? null
             ]);
 
             $conn->commit();
@@ -195,7 +196,7 @@ class PatientService
                 'first_name', 'middle_name', 'last_name', 'phone', 'email',
                 'address_line1', 'address_line2', 'city', 'state', 'zip_code',
                 'emergency_contact_name', 'emergency_contact_phone',
-                'emergency_contact_relationship', 'marital_status'
+                'emergency_contact_relationship', 'marital_status', 'profile_picture'
             ];
 
             foreach ($allowedFields as $field) {
@@ -220,6 +221,7 @@ class PatientService
 
         } catch (\Exception $e) {
             $conn->rollBack();
+            file_put_contents(__DIR__ . '/../../db_error.log', "SQL: $sql\nParams: " . json_encode($params) . "\nError: " . $e->getMessage() . "\n\n", FILE_APPEND);
             throw new \RuntimeException("Failed to update patient: " . $e->getMessage());
         }
     }
@@ -238,8 +240,9 @@ class PatientService
             );
         }
 
-        // Remove timestamps if not needed
+        // Remove timestamps and sensitive wallet balance if not needed
         unset($patient['deleted_at']);
+        unset($patient['wallet_balance']);
 
         return $patient;
     }
@@ -281,6 +284,45 @@ class PatientService
             return $stmt->execute(['id' => $id]);
         } catch (\PDOException $e) {
             throw new \RuntimeException("Failed to delete patient: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Register a minimal walk-in patient record
+     */
+    public function registerWalkIn(array $data): array
+    {
+        $conn = $this->db->getConnection();
+        
+        try {
+            $conn->beginTransaction();
+
+            $id = Uuid::uuid4()->toString();
+            $mrn = 'WK-' . str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+            $stmt = $conn->prepare("
+                INSERT INTO patients (
+                    id, mrn, first_name, last_name, date_of_birth, gender, is_walk_in
+                ) VALUES (
+                    :id, :mrn, :first_name, :last_name, :dob, :gender, 1
+                )
+            ");
+
+            $stmt->execute([
+                'id' => $id,
+                'mrn' => $mrn,
+                'first_name' => $data['first_name'],
+                'last_name' => $data['last_name'],
+                'dob' => $data['date_of_birth'],
+                'gender' => $data['gender']
+            ]);
+
+            $conn->commit();
+            return $this->getPatientById($id);
+
+        } catch (\Exception $e) {
+            $conn->rollBack();
+            throw new \RuntimeException("Failed to register walk-in patient: " . $e->getMessage());
         }
     }
 }

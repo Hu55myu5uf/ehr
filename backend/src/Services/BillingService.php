@@ -67,9 +67,10 @@ class BillingService
             // Add lab test charges
             $labs = $conn->prepare("SELECT id, test_name FROM lab_orders WHERE encounter_id = :eid AND deleted_at IS NULL");
             $labs->execute(['eid' => $encounterId]);
-            $labFee = $this->priceService->getPriceByType('lab_test');
+            $defaultLabFee = $this->priceService->getPriceByType('lab_test');
             foreach ($labs->fetchAll(\PDO::FETCH_ASSOC) as $lab) {
-                $total += $this->addBillItem($conn, $billId, 'lab_test', $lab['test_name'], $lab['id'], 1, $labFee);
+                $specificPrice = $this->priceService->getPriceByItemName($lab['test_name'], $defaultLabFee);
+                $total += $this->addBillItem($conn, $billId, 'lab_test', $lab['test_name'], $lab['id'], 1, $specificPrice);
             }
 
             // Add medication charges (using specific prices if available)
@@ -127,23 +128,25 @@ class BillingService
     {
         $conn = $this->db->getConnection();
         
+        $conn->beginTransaction();
         try {
             // Find unbilled lab orders for this patient
             $stmt = $conn->prepare("
                 SELECT lo.id, lo.test_name 
-            FROM lab_orders lo
-            LEFT JOIN bill_items bi ON lo.id = bi.reference_id AND bi.item_type = 'lab_test'
-            WHERE lo.patient_id = :pid 
-              AND lo.encounter_id IS NULL 
-              AND bi.id IS NULL
-              AND lo.deleted_at IS NULL
-        ");
-        $stmt->execute(['pid' => $patientId]);
-        $unbilledLabs = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+                FROM lab_orders lo
+                LEFT JOIN bill_items bi ON lo.id = bi.reference_id AND bi.item_type = 'lab_test'
+                WHERE lo.patient_id = :pid 
+                  AND lo.encounter_id IS NULL 
+                  AND bi.id IS NULL
+                  AND lo.deleted_at IS NULL
+            ");
+            $stmt->execute(['pid' => $patientId]);
+            $unbilledLabs = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         
-        if (empty($unbilledLabs)) {
-            throw new \RuntimeException('No unbilled standalone lab orders found for this patient');
-        }
+            if (empty($unbilledLabs)) {
+                $conn->rollBack();
+                throw new \RuntimeException('No unbilled standalone lab orders found for this patient');
+            }
 
             // Get patient info for insurance
             $psell = $conn->prepare("SELECT insurance_provider_id FROM patients WHERE id = :pid");
@@ -151,6 +154,9 @@ class BillingService
             $patient = $psell->fetch(\PDO::FETCH_ASSOC);
 
             // Create bill
+            $billId = Uuid::uuid4()->toString();
+            $billNumber = 'BILL-DIR-' . str_pad(mt_rand(1, 99999999), 8, '0', STR_PAD_LEFT);
+
             $stmt = $conn->prepare("
                 INSERT INTO bills (id, patient_id, bill_number, status, created_by)
                 VALUES (:id, :pid, :bn, 'pending', :cb)
@@ -163,9 +169,10 @@ class BillingService
             ]);
 
             $total = 0.00;
-            $labFee = $this->priceService->getPriceByType('lab_test');
+            $defaultLabFee = $this->priceService->getPriceByType('lab_test');
             foreach ($unbilledLabs as $lab) {
-                $total += $this->addBillItem($conn, $billId, 'lab_test', $lab['test_name'], $lab['id'], 1, $labFee);
+                $specificPrice = $this->priceService->getPriceByItemName($lab['test_name'], $defaultLabFee);
+                $total += $this->addBillItem($conn, $billId, 'lab_test', $lab['test_name'], $lab['id'], 1, $specificPrice);
             }
 
             // Update total and calculate portions
@@ -274,6 +281,15 @@ class BillingService
         if (!$bill) throw new \RuntimeException('Bill not found');
 
         $paidAmount = (float)($data['amount'] ?? $bill['total_amount']);
+        $paymentMethod = $data['payment_method'] ?? 'cash';
+
+        // Handle Wallet payment
+        if ($paymentMethod === 'wallet') {
+            $walletService = new WalletService();
+            // Deduct from wallet - this will throw exception if funds are insufficient
+            $walletService->deduct($bill['patient_id'], $paidAmount, $billId, $data['created_by'] ?? null);
+        }
+
         $newPaid = (float)$bill['paid_amount'] + $paidAmount;
         $status = $newPaid >= (float)$bill['total_amount'] ? 'paid' : 'partial';
 
@@ -288,7 +304,7 @@ class BillingService
         $stmt->execute([
             'paid' => $newPaid,
             'status' => $status,
-            'method' => $data['payment_method'] ?? 'cash',
+            'method' => $paymentMethod,
             'ref' => $data['payment_reference'] ?? null,
             'status2' => $status,
             'id' => $billId,
@@ -456,7 +472,7 @@ class BillingService
             ]);
 
             $total = 0.00;
-            $labFee = $this->priceService->getPriceByType('lab_test');
+            $defaultLabFee = $this->priceService->getPriceByType('lab_test');
 
             // Get selected lab orders details
             $placeholders = implode(',', array_fill(0, count($orderIds), '?'));
@@ -469,7 +485,8 @@ class BillingService
             $stmt->execute($orderIds);
             
             foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $lab) {
-                $total += $this->addBillItem($conn, $billId, 'lab_test', $lab['test_name'], $lab['id'], 1, $labFee);
+                $specificPrice = $this->priceService->getPriceByItemName($lab['test_name'], $defaultLabFee);
+                $total += $this->addBillItem($conn, $billId, 'lab_test', $lab['test_name'], $lab['id'], 1, $specificPrice);
             }
 
             // Get patient info for insurance

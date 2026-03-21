@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     CalendarCheck, Search, Plus, Clock, CheckCircle2, XCircle, Loader2,
-    User, Phone, ArrowRight, AlertCircle, ChevronDown
+    User, Phone, ArrowRight, AlertCircle, ChevronDown, UserPlus
 } from 'lucide-react';
 import api from '../api/client';
+import WalkInModal from '../components/WalkInModal';
 
 interface Appointment {
     id: string;
@@ -35,6 +36,7 @@ interface Provider {
     id: string;
     first_name: string;
     last_name: string;
+    specialty: string;
     credentials: string;
 }
 
@@ -54,6 +56,7 @@ export default function Appointments() {
     const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
+    const [isWalkInModalOpen, setIsWalkInModalOpen] = useState(false);
 
     const [form, setForm] = useState({
         patient_id: '',
@@ -115,6 +118,26 @@ export default function Appointments() {
         }
     };
 
+    const handleWalkInSuccess = async (patientData: any) => {
+        try {
+            setSubmitting(true);
+            const res = await api.post('/api/encounters/walk-in', patientData);
+            const newEncounter = res.data;
+            setIsWalkInModalOpen(false);
+            
+            // Navigate to consultation or refresh list
+            if (newEncounter.id) {
+                navigate(`/consultations?id=${newEncounter.id}`);
+            } else {
+                fetchAppointments();
+            }
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Failed to create walk-in encounter');
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
     const updateStatus = async (id: string, status: string) => {
         try {
             const res = await api.patch(`/appointments/${id}/status`, { status });
@@ -161,12 +184,20 @@ export default function Appointments() {
                     <p className="text-sm text-slate-500 mt-1">Manage patient appointments and queue</p>
                 </div>
                 {(user?.role === 'receptionist' || user?.role === 'super_admin') && (
-                    <button
-                        onClick={openModal}
-                        className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-2xl font-semibold text-sm transition-all shadow-lg shadow-brand-500/20"
-                    >
-                        <Plus className="w-4 h-4" /> Book Appointment
-                    </button>
+                    <div className="flex gap-3">
+                        <button
+                            onClick={() => setIsWalkInModalOpen(true)}
+                            className="flex items-center gap-2 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 text-white px-5 py-2.5 rounded-2xl font-semibold text-sm transition-all shadow-lg"
+                        >
+                            <UserPlus className="w-4 h-4 text-brand-500" /> Walk-in
+                        </button>
+                        <button
+                            onClick={openModal}
+                            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-2xl font-semibold text-sm transition-all shadow-lg shadow-brand-500/20"
+                        >
+                            <Plus className="w-4 h-4" /> Book Appointment
+                        </button>
+                    </div>
                 )}
             </div>
 
@@ -297,6 +328,21 @@ export default function Appointments() {
                                                 type="text"
                                                 value={patientSearch}
                                                 onChange={e => setPatientSearch(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter") {
+                                                        e.preventDefault();
+                                                        const filtered = patients.filter(p => {
+                                                            const q = patientSearch.toLowerCase();
+                                                            return p.first_name.toLowerCase().includes(q) || p.last_name.toLowerCase().includes(q) || p.mrn.toLowerCase().includes(q);
+                                                        });
+                                                        if (filtered.length > 0) {
+                                                            const p = filtered[0];
+                                                            setSelectedPatient(p);
+                                                            setForm({ ...form, patient_id: p.id });
+                                                            setPatientSearch("");
+                                                        }
+                                                    }
+                                                }}
                                                 placeholder="Search patients..."
                                                 className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 py-2.5 outline-none focus:border-brand-500 text-sm text-slate-900 dark:text-white"
                                             />
@@ -329,7 +375,7 @@ export default function Appointments() {
                                         <option value="">Select Doctor</option>
                                         {providers.map(p => (
                                             <option key={p.id} value={p.id}>
-                                                Dr. {p.first_name} {p.last_name}
+                                                Dr. {p.first_name} {p.last_name === 'Provider' ? '' : p.last_name} ({p.specialty || 'General Practice'})
                                             </option>
                                         ))}
                                     </select>
@@ -399,6 +445,13 @@ export default function Appointments() {
                     </div>
                 </div>
             )}
+
+            <WalkInModal 
+                isOpen={isWalkInModalOpen}
+                onClose={() => setIsWalkInModalOpen(false)}
+                onSuccess={handleWalkInSuccess}
+                title="Immediate Walk-in Appointment"
+            />
         </div>
     );
 }

@@ -48,6 +48,10 @@ export default function NurseDashboard() {
         rr: '',
         spo2: '',
         weight: '',
+        intake_ml: '',
+        output_ml: '',
+        output_type: 'urine',
+        notes: ''
     });
     const [noteContent, setNoteContent] = useState('');
 
@@ -91,7 +95,7 @@ export default function NurseDashboard() {
                 vitals: vitalsForm,
             });
             setShowVitals(false);
-            setVitalsForm({ temp: '', bp_sys: '', bp_dia: '', hr: '', rr: '', spo2: '', weight: '' });
+            setVitalsForm({ temp: '', bp_sys: '', bp_dia: '', hr: '', rr: '', spo2: '', weight: '', intake_ml: '', output_ml: '', output_type: 'urine', notes: '' });
             selectPatient(selectedPatient);
         } catch (err: any) {
             alert(err.response?.data?.error || 'Failed to save vitals');
@@ -217,11 +221,25 @@ export default function NurseDashboard() {
                                                 </div>
                                                 {n.content && <p className="text-sm text-slate-700 dark:text-slate-300">{n.content}</p>}
                                                 {n.vitals && (
-                                                    <div className="grid grid-cols-4 gap-2 mt-2">
-                                                        {n.vitals.temp && <div className="text-center p-2 bg-slate-50 dark:bg-slate-800 rounded-lg"><p className="text-xs text-slate-400">Temp</p><p className="font-bold text-sm text-slate-900 dark:text-white">{n.vitals.temp}°C</p></div>}
-                                                        {n.vitals.bp_sys && <div className="text-center p-2 bg-slate-50 dark:bg-slate-800 rounded-lg"><p className="text-xs text-slate-400">BP</p><p className="font-bold text-sm text-slate-900 dark:text-white">{n.vitals.bp_sys}/{n.vitals.bp_dia}</p></div>}
-                                                        {n.vitals.hr && <div className="text-center p-2 bg-slate-50 dark:bg-slate-800 rounded-lg"><p className="text-xs text-slate-400">HR</p><p className="font-bold text-sm text-slate-900 dark:text-white">{n.vitals.hr}</p></div>}
-                                                        {n.vitals.spo2 && <div className="text-center p-2 bg-slate-50 dark:bg-slate-800 rounded-lg"><p className="text-xs text-slate-400">SpO₂</p><p className="font-bold text-sm text-slate-900 dark:text-white">{n.vitals.spo2}%</p></div>}
+                                                    <div>
+                                                        <div className="grid grid-cols-4 gap-2 mt-2">
+                                                            {n.vitals.temp && <div className="text-center p-2 bg-slate-50 dark:bg-slate-800 rounded-lg"><p className="text-xs text-slate-400">Temp</p><p className="font-bold text-sm text-slate-900 dark:text-white">{n.vitals.temp}°C</p></div>}
+                                                            {n.vitals.bp_sys && <div className="text-center p-2 bg-slate-50 dark:bg-slate-800 rounded-lg"><p className="text-xs text-slate-400">BP</p><p className="font-bold text-sm text-slate-900 dark:text-white">{n.vitals.bp_sys}/{n.vitals.bp_dia}</p></div>}
+                                                            {n.vitals.hr && <div className="text-center p-2 bg-slate-50 dark:bg-slate-800 rounded-lg"><p className="text-xs text-slate-400">HR</p><p className="font-bold text-sm text-slate-900 dark:text-white">{n.vitals.hr}</p></div>}
+                                                            {n.vitals.spo2 && <div className="text-center p-2 bg-slate-50 dark:bg-slate-800 rounded-lg"><p className="text-xs text-slate-400">SpO₂</p><p className="font-bold text-sm text-slate-900 dark:text-white">{n.vitals.spo2}%</p></div>}
+                                                        </div>
+                                                        {(n.vitals.intake_ml || n.vitals.output_ml) && (
+                                                            <div className="grid grid-cols-2 gap-4 mt-2">
+                                                                {n.vitals.intake_ml && <div className="p-2 bg-blue-500/5 border border-blue-500/10 rounded-lg"><p className="text-[10px] text-blue-500 font-bold uppercase">Intake</p><p className="font-black text-sm text-blue-600">{n.vitals.intake_ml} ml</p></div>}
+                                                                {n.vitals.output_ml && <div className="p-2 bg-rose-500/5 border border-rose-500/10 rounded-lg"><p className="text-[10px] text-rose-500 font-bold uppercase">Output ({n.vitals.output_type})</p><p className="font-black text-sm text-rose-600">{n.vitals.output_ml} ml</p></div>}
+                                                            </div>
+                                                        )}
+                                                        {n.vitals.notes && (
+                                                            <div className="mt-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
+                                                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1 text-[9px]">Observation Notes</p>
+                                                                <p className="text-xs text-slate-600 dark:text-slate-400 italic font-medium">{n.vitals.notes}</p>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>
@@ -230,71 +248,124 @@ export default function NurseDashboard() {
                                 )}
                             </div>
 
-                            {/* Vitals Modal */}
                             {showVitals && (
-                                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-8 shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[85vh] overflow-y-auto scrollbar-slim modal-content-scroll">
-                                        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Record Vitals</h3>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div>
-                                                <label className="text-xs text-slate-500 font-bold">Temperature (°C)</label>
-                                                <input list="temps" type="number" step="0.1" value={vitalsForm.temp} onChange={e => setVitalsForm({ ...vitalsForm, temp: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm outline-none text-slate-900 dark:text-white" />
-                                                <datalist id="temps">{COMMON_TEMPS.map(t => <option key={t} value={t} />)}</datalist>
+                                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
+                                    <form 
+                                        onSubmit={(e) => {
+                                            e.preventDefault();
+                                            submitVitals();
+                                        }} 
+                                        className="bg-white dark:bg-slate-900 rounded-[3rem] w-full max-w-2xl p-10 shadow-2xl border border-slate-200 dark:border-slate-800 overflow-y-auto max-h-[90vh]"
+                                    >
+                                        <div className="flex items-center justify-between mb-8">
+                                            <h3 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight">Record Observation</h3>
+                                            <button type="button" onClick={() => setShowVitals(false)} className="text-slate-400 hover:text-slate-600"><Plus className="w-8 h-8 rotate-45" /></button>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                            <div className="space-y-6">
+                                                <h4 className="text-sm font-black text-rose-600 uppercase tracking-widest">Clinical Vitals</h4>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Temp (°C)</label>
+                                                        <input list="temps" type="number" step="0.1" value={vitalsForm.temp} onChange={e => setVitalsForm({...vitalsForm, temp: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm outline-none focus:border-brand-500 font-bold" />
+                                                        <datalist id="temps">{COMMON_TEMPS.map(t => <option key={t} value={t} />)}</datalist>
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">SpO2 (%)</label>
+                                                        <input list="spo2s" type="number" value={vitalsForm.spo2} onChange={e => setVitalsForm({...vitalsForm, spo2: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm outline-none focus:border-brand-500 font-bold" />
+                                                        <datalist id="spo2s">{COMMON_SPO2.map(s => <option key={s} value={s} />)}</datalist>
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">BP Sys</label>
+                                                        <input list="sys" type="number" value={vitalsForm.bp_sys} onChange={e => setVitalsForm({...vitalsForm, bp_sys: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm outline-none focus:border-brand-500 font-bold" />
+                                                        <datalist id="sys">{COMMON_SYS.map(s => <option key={s} value={s} />)}</datalist>
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">BP Dia</label>
+                                                        <input list="dia" type="number" value={vitalsForm.bp_dia} onChange={e => setVitalsForm({...vitalsForm, bp_dia: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm outline-none focus:border-brand-500 font-bold" />
+                                                        <datalist id="dia">{COMMON_DIA.map(d => <option key={d} value={d} />)}</datalist>
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">HR (bpm)</label>
+                                                        <input list="hrs" type="number" value={vitalsForm.hr} onChange={e => setVitalsForm({...vitalsForm, hr: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm outline-none focus:border-brand-500 font-bold" />
+                                                        <datalist id="hrs">{COMMON_HR.map(h => <option key={h} value={h} />)}</datalist>
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">RR</label>
+                                                        <input list="rrs" type="number" value={vitalsForm.rr} onChange={e => setVitalsForm({...vitalsForm, rr: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm outline-none focus:border-brand-500 font-bold" />
+                                                        <datalist id="rrs">{COMMON_RR.map(r => <option key={r} value={r} />)}</datalist>
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Weight (kg)</label>
+                                                        <input type="number" step="0.1" value={vitalsForm.weight} onChange={e => setVitalsForm({...vitalsForm, weight: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm outline-none focus:border-brand-500 font-bold" />
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <label className="text-xs text-slate-500 font-bold">BP Systolic</label>
-                                                <input list="sys" type="number" value={vitalsForm.bp_sys} onChange={e => setVitalsForm({ ...vitalsForm, bp_sys: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm outline-none text-slate-900 dark:text-white" />
-                                                <datalist id="sys">{COMMON_SYS.map(s => <option key={s} value={s} />)}</datalist>
-                                            </div>
-                                            <div>
-                                                <label className="text-xs text-slate-500 font-bold">BP Diastolic</label>
-                                                <input list="dia" type="number" value={vitalsForm.bp_dia} onChange={e => setVitalsForm({ ...vitalsForm, bp_dia: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm outline-none text-slate-900 dark:text-white" />
-                                                <datalist id="dia">{COMMON_DIA.map(d => <option key={d} value={d} />)}</datalist>
-                                            </div>
-                                            <div>
-                                                <label className="text-xs text-slate-500 font-bold">Heart Rate (bpm)</label>
-                                                <input list="hrs" type="number" value={vitalsForm.hr} onChange={e => setVitalsForm({ ...vitalsForm, hr: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm outline-none text-slate-900 dark:text-white" />
-                                                <datalist id="hrs">{COMMON_HR.map(h => <option key={h} value={h} />)}</datalist>
-                                            </div>
-                                            <div>
-                                                <label className="text-xs text-slate-500 font-bold">Respiratory Rate</label>
-                                                <input list="rrs" type="number" value={vitalsForm.rr} onChange={e => setVitalsForm({ ...vitalsForm, rr: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm outline-none text-slate-900 dark:text-white" />
-                                                <datalist id="rrs">{COMMON_RR.map(r => <option key={r} value={r} />)}</datalist>
-                                            </div>
-                                            <div>
-                                                <label className="text-xs text-slate-500 font-bold">SpO₂ (%)</label>
-                                                <input list="spo2s" type="number" value={vitalsForm.spo2} onChange={e => setVitalsForm({ ...vitalsForm, spo2: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm outline-none text-slate-900 dark:text-white" />
-                                                <datalist id="spo2s">{COMMON_SPO2.map(s => <option key={s} value={s} />)}</datalist>
-                                            </div>
-                                            <div>
-                                                <label className="text-xs text-slate-500 font-bold">Weight (kg)</label>
-                                                <input type="number" step="0.1" value={vitalsForm.weight} onChange={e => setVitalsForm({ ...vitalsForm, weight: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm outline-none text-slate-900 dark:text-white" />
+
+                                            <div className="space-y-6">
+                                                <h4 className="text-sm font-black text-blue-600 uppercase tracking-widest">Intake & Output</h4>
+                                                <div className="space-y-4">
+                                                    <div>
+                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Fluid Intake (ml)</label>
+                                                        <input type="number" value={vitalsForm.intake_ml} onChange={e => setVitalsForm({...vitalsForm, intake_ml: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm outline-none focus:border-brand-500 font-bold" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Output volume (ml)</label>
+                                                        <input type="number" value={vitalsForm.output_ml} onChange={e => setVitalsForm({...vitalsForm, output_ml: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm outline-none focus:border-brand-500 font-bold" />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Output Type</label>
+                                                        <select value={vitalsForm.output_type} onChange={e => setVitalsForm({...vitalsForm, output_type: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm outline-none focus:border-brand-500 font-bold">
+                                                            <option value="urine">Urine</option>
+                                                            <option value="drain">Drain</option>
+                                                            <option value="vomitus">Vomitus</option>
+                                                            <option value="other">Other</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
-                                        <div className="flex justify-end gap-3 mt-6">
-                                            <button onClick={() => setShowVitals(false)} className="px-4 py-2 text-sm text-slate-500 font-semibold">Cancel</button>
-                                            <button onClick={submitVitals} disabled={submitting} className="flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-5 py-2 rounded-xl font-semibold text-sm disabled:opacity-50">
-                                                {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Heart className="w-4 h-4" />} Save Vitals
+
+                                        <div className="mt-8">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Observation Notes</label>
+                                            <textarea value={vitalsForm.notes} onChange={e => setVitalsForm({...vitalsForm, notes: e.target.value})} rows={2} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl px-4 py-3 text-sm outline-none focus:border-brand-500 font-bold" />
+                                        </div>
+
+                                        <div className="flex justify-end gap-4 mt-10">
+                                            <button type="button" onClick={() => setShowVitals(false)} className="px-6 py-3 text-sm font-black text-slate-500 uppercase tracking-widest">Cancel</button>
+                                            <button 
+                                                type="submit" 
+                                                disabled={submitting}
+                                                className="bg-rose-600 hover:bg-rose-700 text-white px-10 py-3 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-rose-600/20 transition-all disabled:opacity-50"
+                                            >
+                                                {submitting ? 'Saving...' : 'Save Observation'}
                                             </button>
                                         </div>
-                                    </div>
+                                    </form>
                                 </div>
                             )}
 
                             {/* Note Modal */}
                             {showNote && (
                                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-8 shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[85vh] overflow-y-auto scrollbar-slim modal-content-scroll">
+                                    <form 
+                                        onSubmit={(e) => {
+                                            e.preventDefault();
+                                            submitNote();
+                                        }} 
+                                        className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-8 shadow-2xl border border-slate-200 dark:border-slate-800 max-h-[85vh] overflow-y-auto scrollbar-slim modal-content-scroll"
+                                    >
                                         <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Add Care Note</h3>
                                         <textarea value={noteContent} onChange={e => setNoteContent(e.target.value)} rows={4} placeholder="Enter care note..."
                                             className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm outline-none focus:border-brand-500 text-slate-900 dark:text-white resize-none" />
                                         <div className="flex justify-end gap-3 mt-4">
-                                            <button onClick={() => setShowNote(false)} className="px-4 py-2 text-sm text-slate-500 font-semibold">Cancel</button>
-                                            <button onClick={submitNote} disabled={submitting} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2 rounded-xl font-semibold text-sm disabled:opacity-50">
+                                            <button type="button" onClick={() => setShowNote(false)} className="px-4 py-2 text-sm text-slate-500 font-semibold">Cancel</button>
+                                            <button type="submit" disabled={submitting} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2 rounded-xl font-semibold text-sm disabled:opacity-50">
                                                 {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />} Save Note
                                             </button>
                                         </div>
-                                    </div>
+                                    </form>
                                 </div>
                             )}
                         </div>

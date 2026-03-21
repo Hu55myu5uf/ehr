@@ -34,10 +34,22 @@ use App\Controllers\PriceListController;
 use App\Controllers\WardController;
 use App\Controllers\SettingsController;
 use App\Controllers\AIController;
+use App\Controllers\WalletController;
+use App\Controllers\AuditController;
 
 // Load environment variables
 $dotenv = Dotenv::createImmutable(__DIR__ . '/..');
 $dotenv->load();
+
+// Initialize Audit Middleware globally
+$auditMiddleware = new AuditMiddleware();
+register_shutdown_function(function() use ($auditMiddleware) {
+    // Only log if auth was successful (user object exists) and it's an API request
+    global $user, $uri;
+    if (isset($user) && strpos($uri, '/api/') === 0 && $uri !== '/api/audit/logs') {
+        $auditMiddleware->logRequest($user);
+    }
+});
 
 // Error handling
 error_reporting($_ENV['APP_DEBUG'] === 'true' ? E_ALL : 0);
@@ -73,6 +85,9 @@ header('Referrer-Policy: strict-origin-when-cross-origin');
 
 // Get request method and URI
 $method = $_SERVER['REQUEST_METHOD'];
+if ($method === 'POST' && isset($_GET['_method'])) {
+    $method = strtoupper($_GET['_method']);
+}
 $requestUri = $_SERVER['REQUEST_URI'];
 $uriPath = parse_url($requestUri, PHP_URL_PATH);
 
@@ -165,6 +180,10 @@ try {
         $controller = new PatientController();
         $controller->create($user);
     }
+    elseif ($uri === '/api/patients/walk-in' && $method === 'POST') {
+        $controller = new PatientController();
+        $controller->createWalkIn($user);
+    }
     elseif ($uri === '/api/patients/search' && $method === 'GET') {
         $controller = new PatientController();
         $controller->search($user);
@@ -183,6 +202,10 @@ try {
     }
     
     // ── Encounter routes ──
+    elseif ($uri === '/api/encounters/walk-in' && $method === 'POST') {
+        $controller = new EncounterController();
+        $controller->createWalkIn($user);
+    }
     elseif ($uri === '/api/encounters' && $method === 'GET') {
         $controller = new EncounterController();
         $controller->index($user);
@@ -246,7 +269,7 @@ try {
     }
     elseif ($uri === '/api/users/profile-picture' && $method === 'POST') {
         $controller = new UserController();
-        $controller->uploadProfilePicture($user);
+        $controller->uploadProfilePicture($userArray);
     }
     elseif ($uri === '/api/users/password' && $method === 'PUT') {
         $controller = new UserController();
@@ -357,6 +380,10 @@ try {
         $controller = new PharmacyController();
         $controller->getPatientPrescriptions($user, $matches[1]);
     }
+    elseif ($uri === '/api/pharmacy/invoicing/pending' && $method === 'GET') {
+        $controller = new PharmacyController();
+        $controller->getInvoicingQueue($user);
+    }
     elseif ($uri === '/api/pharmacy/invoice' && $method === 'POST') {
         $controller = new PharmacyController();
         $controller->generateInvoice($user);
@@ -433,6 +460,10 @@ try {
     elseif ($uri === '/api/reports/comprehensive' && $method === 'GET') {
         $controller = new ReportController();
         $controller->getComprehensiveReport($user);
+    }
+    elseif ($uri === '/api/reports/performance' && $method === 'GET') {
+        $controller = new ReportController();
+        $controller->getPerformanceOverview($user);
     }
 
     // ── Insurance routes ──
@@ -585,6 +616,22 @@ try {
     elseif (preg_match('#^/api/billing/([0-9a-f-]+)/pay$#', $uri, $matches) && $method === 'POST') {
         $controller = new BillingController();
         $controller->pay($user, $matches[1]);
+    }
+    
+    // ── Wallet routes ──
+    elseif ($uri === '/api/wallet/deposit' && $method === 'POST') {
+        $controller = new WalletController();
+        $controller->deposit($userArray);
+    }
+    elseif (preg_match('#^/api/wallet/history/([0-9a-f-]+)$#', $uri, $matches) && $method === 'GET') {
+        $controller = new WalletController();
+        $controller->history($userArray, $matches[1]);
+    }
+    
+    // ── Audit Logs routes ──
+    elseif ($uri === '/api/audit/logs' && $method === 'GET') {
+        $controller = new AuditController();
+        $controller->index($user);
     }
     
     // ── Laboratory routes ──

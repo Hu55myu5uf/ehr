@@ -71,4 +71,18 @@ class ReportController
             $this->error($e->getMessage(), $e->getCode() ?: 500);
         }
     }
+
+    /**
+     * Get system performance overview stats
+     * GET /api/reports/performance
+     */
+    public function getPerformanceOverview(object $user): void
+    {
+        try {
+            AuthMiddleware::requireRole($user, [Roles::SUPER_ADMIN]);
+            $this->success($this->service->getPerformanceOverview());
+        } catch (\Exception $e) {
+            $this->error($e->getMessage(), $e->getCode() ?: 500);
+        }
+    }
 }

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Search, UserPlus, Filter, MoreHorizontal, ChevronRight, Loader2, Trash2, Microscope, X, Beaker, AlertCircle } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Search, UserPlus, Filter, MoreHorizontal, ChevronRight, Loader2, Trash2, Microscope, X, Beaker, AlertCircle, Edit } from 'lucide-react';
 import api from '../api/client';
 
 const LAB_TESTS = [
@@ -45,10 +45,12 @@ interface Patient {
     date_of_birth: string;
     email: string;
     phone: string;
+    profile_picture?: string;
     deleted_at: string | null;
 }
 
 export default function PatientDashboard() {
+    const navigate = useNavigate();
     const [patients, setPatients] = useState<Patient[]>([]);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
@@ -165,13 +167,15 @@ export default function PatientDashboard() {
             <div className="flex items-center gap-4 bg-slate-100 dark:bg-slate-900/50 p-2 rounded-2xl border border-slate-200 dark:border-slate-800">
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-3 w-5 h-5 text-slate-400 dark:text-slate-500" />
-                    <input
-                        type="text"
-                        placeholder="Search by name, patient ID, or SSN..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="w-full bg-transparent border-none outline-none pl-10 pr-4 py-2.5 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600"
-                    />
+                    <form onSubmit={(e) => e.preventDefault()}>
+                        <input
+                            type="text"
+                            placeholder="Search by name, patient ID, or SSN..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="w-full bg-transparent border-none outline-none pl-10 pr-4 py-2.5 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-600"
+                        />
+                    </form>
                 </div>
                 <button className="p-2.5 text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 rounded-xl transition-all">
                     <Filter className="w-5 h-5" />
@@ -207,11 +211,23 @@ export default function PatientDashboard() {
                             </tr>
                         ) : (
                             filteredPatients.map((patient) => (
-                                <tr key={patient.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group">
+                                <tr 
+                                    key={patient.id} 
+                                    onClick={() => navigate(`/patients/${patient.id}`)}
+                                    className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group cursor-pointer"
+                                >
                                     <td className="px-6 py-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-bold text-brand-500">
-                                                {patient.first_name[0]}{patient.last_name[0]}
+                                            <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center font-bold text-brand-500 overflow-hidden">
+                                                {patient.profile_picture ? (
+                                                    <img 
+                                                        src={`${api.defaults.baseURL?.replace('/api', '')}/${patient.profile_picture}`} 
+                                                        alt="Profile" 
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                ) : (
+                                                    <>{patient.first_name[0]}{patient.last_name[0]}</>
+                                                )}
                                             </div>
                                             <div>
                                                 <div className="font-semibold text-slate-900 dark:text-white group-hover:text-brand-500 transition-colors">
@@ -236,25 +252,32 @@ export default function PatientDashboard() {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <div className="flex items-center justify-end gap-2 outline-none">
+                                        <div className="flex items-center justify-end gap-2 outline-none" onClick={(e) => e.stopPropagation()}>
                                             {isSuperAdmin && (
                                                 <button
-                                                    onClick={() => handleDelete(patient.id, `${patient.first_name} ${patient.last_name}`)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDelete(patient.id, `${patient.first_name} ${patient.last_name}`);
+                                                    }}
                                                     className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100"
                                                     title="Delete Patient"
                                                 >
                                                     <Trash2 className="w-5 h-5" />
                                                 </button>
                                             )}
-                                            <button className="p-2 text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-all opacity-0 group-hover:opacity-100">
-                                                <MoreHorizontal className="w-5 h-5" />
-                                            </button>
-                                            <Link to={`/patients/${patient.id}`} className="p-2 text-slate-400 hover:text-brand-500 hover:bg-brand-500/10 rounded-lg transition-all">
-                                                <ChevronRight className="w-5 h-5" />
+                                            <Link 
+                                                to={`/patients/edit/${patient.id}`} 
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="p-2 text-slate-400 hover:text-brand-500 hover:bg-brand-500/10 rounded-lg transition-all opacity-0 group-hover:opacity-100" 
+                                                title="Edit Profile"
+                                            >
+                                                <Edit className="w-5 h-5" />
                                             </Link>
+                                            
                                             {(user?.role === 'receptionist' || user?.role === 'super_admin' || user?.role === 'doctor') && (
                                                 <button
-                                                    onClick={() => {
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
                                                         setSelectedPatient(patient);
                                                         setIsOrderModalOpen(true);
                                                     }}

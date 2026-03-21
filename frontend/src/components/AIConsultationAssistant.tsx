@@ -126,7 +126,7 @@ export default function AIConsultationAssistant({
                                         </div>
                                         <button 
                                             onClick={() => onApplyDiagnosis({ diagnosis: d.diagnosis, icd_code: d.icd_code })}
-                                            className="p-1.5 opacity-0 group-hover:opacity-100 bg-brand-500 text-white rounded-lg transition-all"
+                                            className="p-1.5 bg-brand-500 text-white rounded-lg transition-all shadow-md"
                                             title="Apply to Form"
                                         >
                                             <Plus className="w-4 h-4" />
@@ -168,7 +168,7 @@ export default function AIConsultationAssistant({
                                         </div>
                                         <button 
                                             onClick={() => onApplyMed({ medication: m.medication, dosage: m.dosage, frequency: m.frequency })}
-                                            className="p-2 bg-emerald-600 text-white rounded-xl opacity-0 group-hover:opacity-100 transition-all shadow-lg shadow-emerald-500/20"
+                                            className="p-2 bg-emerald-600 text-white rounded-xl transition-all shadow-lg shadow-emerald-500/20"
                                         >
                                             <Plus className="w-4 h-4" />
                                         </button>

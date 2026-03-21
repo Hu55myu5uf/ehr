@@ -2,9 +2,10 @@ import React, { useEffect, useState } from 'react';
 import {
     Search, Loader2, CheckCircle2, AlertCircle,
     User, Clock, Banknote, FileText, Printer, CreditCard,
-    ShieldCheck, XCircle, X, Beaker, Pill, ChevronRight
+    ShieldCheck, XCircle, X, Beaker, Pill, ChevronRight, Wallet
 } from 'lucide-react';
 import api from '../api/client';
+import InvoiceModal from '../components/InvoiceModal';
 
 interface Bill {
     id: string;
@@ -56,8 +57,10 @@ export default function Billing() {
     // Bills state
     const [bills, setBills] = useState<Bill[]>([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState('');
+    const [filter, setFilter] = useState('pending');
     const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
+    const [showPrintModal, setShowPrintModal] = useState(false);
+    const [isReceiptMode, setIsReceiptMode] = useState(false);
     const [loadingBill, setLoadingBill] = useState(false);
     const [showPayModal, setShowPayModal] = useState(false);
     const [payForm, setPayForm] = useState({ amount: '', payment_method: 'cash', payment_reference: '' });
@@ -72,8 +75,11 @@ export default function Billing() {
 
     useEffect(() => {
         if (activeTab === 'bills') fetchBills();
-        else fetchPendingVerification();
     }, [activeTab, filter]);
+
+    useEffect(() => {
+        if (activeTab === 'orders') fetchPendingVerification();
+    }, [activeTab]);
 
     const fetchBills = async () => {
         try {
@@ -142,6 +148,9 @@ export default function Billing() {
             setPayForm({ amount: '', payment_method: 'cash', payment_reference: '' });
             viewBill(selectedBill.id);
             fetchBills();
+            // Automatically show receipt for printing
+            setIsReceiptMode(true);
+            setShowPrintModal(true);
         } catch (err: any) {
             alert(err.response?.data?.error || 'Payment failed');
         } finally {
@@ -192,7 +201,7 @@ export default function Billing() {
                         }`}
                 >
                     <Clock className="w-4 h-4" />
-                    Unbilled Services
+                    Pending Invoicing
                     {totalPending > 0 && (
                         <span className="bg-brand-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full ml-1 animate-pulse">
                             {totalPending}
@@ -321,7 +330,12 @@ export default function Billing() {
                 <>
                     {/* Filters */}
                     <div className="flex gap-2">
-                        {[{ label: 'All', value: '' }, { label: 'Pending', value: 'pending' }, { label: 'Partial', value: 'partial' }, { label: 'Paid', value: 'paid' }].map(f => (
+                        {[
+                            { label: 'Pending', value: 'pending' },
+                            { label: 'Partial', value: 'partial' },
+                            { label: 'All', value: '' },
+                            { label: 'Paid', value: 'paid' }
+                        ].map(f => (
                             <button
                                 key={f.value}
                                 onClick={() => setFilter(f.value)}
@@ -390,7 +404,14 @@ export default function Billing() {
                                             <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mt-0.5">ID: {selectedBill.mrn} • ISSUED {new Date(selectedBill.generated_at).toLocaleDateString()}</p>
                                         </div>
                                         <div className="flex gap-2">
-                                            <button className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 hover:border-brand-500/50 transition-all">
+                                            <button 
+                                                onClick={() => {
+                                                    setIsReceiptMode(selectedBill.status === 'paid');
+                                                    setShowPrintModal(true);
+                                                }}
+                                                className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 hover:border-brand-500/50 transition-all"
+                                                title="Print Invoice"
+                                            >
                                                 <Printer className="w-4 h-4 text-slate-400" />
                                             </button>
                                         </div>
@@ -485,10 +506,18 @@ export default function Billing() {
             {/* Payment Modal */}
             {showPayModal && selectedBill && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh] w-full max-w-md">
+                    <form 
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            if (!paying && parseFloat(payForm.amount) > 0) {
+                                processPayment();
+                            }
+                        }}
+                        className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh] w-full max-w-md"
+                    >
                         <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                             <h3 className="text-2xl font-bold text-slate-900 dark:text-white">Process Payment</h3>
-                            <button onClick={() => setShowPayModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors">
+                            <button type="button" onClick={() => setShowPayModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors">
                                 <XCircle className="w-6 h-6" />
                             </button>
                         </div>
@@ -516,6 +545,7 @@ export default function Billing() {
                                         <option value="card">Card</option>
                                         <option value="transfer">Bank Transfer</option>
                                         <option value="mobile">Mobile Payment</option>
+                                        <option value="wallet">Patient Wallet</option>
                                     </select>
                                 </div>
                                 <div>
@@ -530,25 +560,33 @@ export default function Billing() {
                                 </div>
                             </div>
                             <div className="p-8 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-white dark:bg-slate-900 sticky bottom-0">
-                                <button onClick={() => setShowPayModal(false)} className="px-5 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800">
+                                <button type="button" onClick={() => setShowPayModal(false)} className="px-5 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800">
                                     Cancel
                                 </button>
-                                <button onClick={processPayment} disabled={paying} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50">
+                                <button type="submit" disabled={paying} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-all shadow-lg shadow-emerald-500/20 disabled:opacity-50">
                                     {paying ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} Confirm Payment
                                 </button>
                             </div>
                         </div>
-                    </div>
+                    </form>
                 </div>
             )}
 
             {/* Reject Modal */}
             {showRejectModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh] w-full max-w-md">
+                    <form 
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            if (rejectNotes.trim()) {
+                                handleVerify(showRejectModal.id, showRejectModal.type, 'rejected', rejectNotes);
+                            }
+                        }}
+                        className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh] w-full max-w-md"
+                    >
                         <div className="p-8 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                             <h3 className="text-2xl font-bold text-rose-600 flex items-center gap-2"><XCircle className="w-6 h-6" /> Reject Order</h3>
-                            <button onClick={() => { setShowRejectModal(null); setRejectNotes(''); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors">
+                            <button type="button" onClick={() => { setShowRejectModal(null); setRejectNotes(''); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors">
                                 <X className="w-6 h-6" />
                             </button>
                         </div>
@@ -567,11 +605,11 @@ export default function Billing() {
                                 </div>
                             </div>
                             <div className="p-8 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3 bg-white dark:bg-slate-900 sticky bottom-0">
-                                <button onClick={() => { setShowRejectModal(null); setRejectNotes(''); }} className="px-5 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800">
+                                <button type="button" onClick={() => { setShowRejectModal(null); setRejectNotes(''); }} className="px-5 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800">
                                     Cancel
                                 </button>
                                 <button
-                                    onClick={() => handleVerify(showRejectModal.id, showRejectModal.type, 'rejected', rejectNotes)}
+                                    type="submit"
                                     disabled={!rejectNotes.trim()}
                                     className="flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-all shadow-lg shadow-rose-500/20 disabled:opacity-50"
                                 >
@@ -579,9 +617,16 @@ export default function Billing() {
                                 </button>
                             </div>
                         </div>
-                    </div>
+                    </form>
                 </div>
             )}
+
+            <InvoiceModal 
+                isOpen={showPrintModal}
+                onClose={() => setShowPrintModal(false)}
+                bill={selectedBill}
+                isReceipt={isReceiptMode}
+            />
         </div>
     );
 }

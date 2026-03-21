@@ -3,7 +3,7 @@ import {
     ArrowLeft, Save, CheckCircle2, Loader2, User, Stethoscope,
     FileText, Heart, Brain, AlertCircle, Plus, Trash2, Beaker, Pill,
     Paperclip, Image as ImageIcon, File as FileIcon, X, Upload, Search,
-    Pencil, Eraser, PenTool, Tablets, Send
+    Pencil, Eraser, PenTool, Tablets, Send, Activity, Clock, Phone, Users
 } from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api/client';
@@ -318,7 +318,38 @@ export default function ConsultationForm({ id: propId, embedded = false }: Consu
     const [icdResults, setIcdResults] = useState<typeof ICD10_CODES>([]);
     const [scribeMode, setScribeMode] = useState<'standard' | 'digital'>('standard');
 
-    useEffect(() => { if (id) fetchData(); }, [id]);
+    const [availableTests, setAvailableTests] = useState<any[]>([]);
+
+    useEffect(() => { 
+        if (id) {
+            fetchData();
+            fetchAvailableTests();
+        }
+    }, [id]);
+
+    const fetchAvailableTests = async () => {
+        try {
+            const res = await api.get('/admin/prices');
+            const labTests = res.data.filter((p: any) => p.item_type === 'lab_test');
+            
+            // Group by category
+            const grouped = labTests.reduce((acc: any, curr: any) => {
+                const category = curr.category || 'General';
+                if (!acc[category]) acc[category] = [];
+                acc[category].push(curr.item_name);
+                return acc;
+            }, {});
+
+            const formatted = Object.keys(grouped).map(cat => ({
+                category: cat,
+                tests: grouped[cat]
+            }));
+
+            setAvailableTests(formatted);
+        } catch (err) {
+            console.error('Failed to fetch available tests', err);
+        }
+    };
 
     const fetchData = async () => {
         try {
@@ -365,14 +396,16 @@ export default function ConsultationForm({ id: propId, embedded = false }: Consu
             
             if (batchMeds.length > 0) {
                 try {
-                    await api.post('/medications', { patient_id: encounter.patient_id, encounter_id: id, items: batchMeds });
+                    const itemsToPrescribe = batchMeds.map(({ id: _, ...rest }) => rest);
+                    await api.post('/medications', { patient_id: encounter.patient_id, encounter_id: id, items: itemsToPrescribe });
                     setBatchMeds([]);
                     shouldRefresh = true;
                 } catch(e) { console.error(e); }
             }
             if (batchLabs.length > 0) {
                 try {
-                    await api.post('/labs/orders', { patient_id: encounter.patient_id, encounter_id: id, priority: 'routine', items: batchLabs });
+                    const itemsToOrder = batchLabs.map(({ id: _, ...rest }) => rest);
+                    await api.post('/labs/orders', { patient_id: encounter.patient_id, encounter_id: id, priority: 'routine', items: itemsToOrder });
                     setBatchLabs([]);
                     shouldRefresh = true;
                 } catch(e) { console.error(e); }
@@ -399,12 +432,14 @@ export default function ConsultationForm({ id: propId, embedded = false }: Consu
             // Auto-submit any pending batches before saving the note itself
             if (batchMeds.length > 0) {
                 try {
-                    await api.post('/medications', { patient_id: encounter.patient_id, encounter_id: id, items: batchMeds });
+                    const itemsToPrescribe = batchMeds.map(({ id: _, ...rest }) => rest);
+                    await api.post('/medications', { patient_id: encounter.patient_id, encounter_id: id, items: itemsToPrescribe });
                 } catch(e) { console.error(e); }
             }
             if (batchLabs.length > 0) {
                 try {
-                    await api.post('/labs/orders', { patient_id: encounter.patient_id, encounter_id: id, priority: 'routine', items: batchLabs });
+                    const itemsToOrder = batchLabs.map(({ id: _, ...rest }) => rest);
+                    await api.post('/labs/orders', { patient_id: encounter.patient_id, encounter_id: id, priority: 'routine', items: itemsToOrder });
                 } catch(e) { console.error(e); }
             }
 
@@ -784,13 +819,40 @@ export default function ConsultationForm({ id: propId, embedded = false }: Consu
 
             {/* Biodata (read-only) */}
             <Section title="Patient Biodata" icon={<User className="w-4 h-4 text-brand-500" />} defaultOpen={true}>
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 text-sm">
-                    <div><span className="text-slate-400 text-[10px] uppercase tracking-wider font-bold block mb-0.5">Name</span><p className="font-bold text-slate-900 dark:text-white uppercase truncate">{encounter?.first_name} {encounter?.last_name}</p></div>
-                    <div><span className="text-slate-400 text-[10px] uppercase tracking-wider font-bold block mb-0.5">MRN</span><p className="font-mono text-xs text-slate-800 dark:text-slate-200">{encounter?.mrn}</p></div>
-                    <div><span className="text-slate-400 text-[10px] uppercase tracking-wider font-bold block mb-0.5">DOB</span><p className="text-slate-800 dark:text-slate-200 text-xs">{encounter?.date_of_birth}</p></div>
-                    <div><span className="text-slate-400 text-[10px] uppercase tracking-wider font-bold block mb-0.5">Gender</span><p className="capitalize text-slate-800 dark:text-slate-200 text-xs">{encounter?.gender}</p></div>
-                    <div className="hidden md:block"><span className="text-slate-400 text-[10px] uppercase tracking-wider font-bold block mb-0.5">Phone</span><p className="text-slate-800 dark:text-slate-200 text-xs">{encounter?.phone || '—'}</p></div>
-                    <div className="hidden lg:block"><span className="text-slate-400 text-[10px] uppercase tracking-wider font-bold block mb-0.5">Next of Kin</span><p className="text-slate-800 dark:text-slate-200 text-xs">{encounter?.next_of_kin_name || '—'}</p></div>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 text-sm">
+                    <div className="space-y-1">
+                        <span className="text-slate-400 text-[10px] uppercase tracking-wider font-black block">Basic Info</span>
+                        <p className="font-bold text-slate-900 dark:text-white uppercase truncate">{encounter?.first_name} {encounter?.last_name}</p>
+                        <p className="font-mono text-[10px] text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded w-fit">{encounter?.mrn}</p>
+                    </div>
+                    <div className="space-y-1">
+                        <span className="text-slate-400 text-[10px] uppercase tracking-wider font-black block">Demographics</span>
+                        <p className="text-slate-800 dark:text-slate-200 font-bold">{encounter?.gender} • {encounter?.date_of_birth}</p>
+                        <p className="text-slate-500 text-[11px] font-medium italic">Age: {encounter?.date_of_birth ? Math.floor((new Date().getTime() - new Date(encounter.date_of_birth).getTime()) / 31536000000) : 'N/A'} Yrs</p>
+                    </div>
+                    <div className="space-y-1">
+                        <span className="text-slate-400 text-[10px] uppercase tracking-wider font-black block">Contact Info</span>
+                        <p className="text-slate-800 dark:text-slate-200 font-bold">{encounter?.phone || 'No Phone'}</p>
+                        <p className="text-slate-500 text-[11px] font-medium truncate">{encounter?.email || 'No Email'}</p>
+                    </div>
+                    <div className="space-y-1 col-span-2">
+                        <span className="text-slate-400 text-[10px] uppercase tracking-wider font-black block">Next of Kin</span>
+                        <div className="bg-slate-50 dark:bg-slate-800/50 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <p className="font-bold text-brand-600 dark:text-brand-400 uppercase text-xs">
+                                {encounter?.next_of_kin_name || 'Not Provided'}
+                            </p>
+                            {encounter?.next_of_kin_name && (
+                                <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1 font-medium text-[10px] text-slate-500">
+                                    <span className="flex items-center gap-1">
+                                        <Users className="w-3 h-3" /> {encounter?.next_of_kin_relationship || 'Relation N/A'}
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                        <Phone className="w-3 h-3" /> {encounter?.next_of_kin_phone || 'No Phone'}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </Section>
 
@@ -915,7 +977,7 @@ export default function ConsultationForm({ id: propId, embedded = false }: Consu
 
 
                     {/* Section 2 — Investigation */}
-                    <Section title={`Investigation (${labs.length})`} icon={<Beaker className="w-5 h-5 text-amber-500" />} defaultOpen={true}>
+                    <Section title={`Investigation (${labs.length}${batchLabs.length > 0 ? ` + ${batchLabs.length}` : ''})`} icon={<Beaker className="w-5 h-5 text-amber-500" />} defaultOpen={true}>
                         <div className="space-y-4">
                             {/* Investigation category selector */}
                             {!isCompleted && (
@@ -948,13 +1010,19 @@ export default function ConsultationForm({ id: propId, embedded = false }: Consu
                             {!isCompleted && selectedInvestigations.includes('laboratory') && (
                                 <div className="animate-in slide-in-from-top-2 duration-200 bg-amber-50/50 dark:bg-amber-500/5 border border-amber-200 dark:border-amber-900/30 rounded-xl p-4">
                                     <label className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-2 block">Laboratory Tests</label>
-                                    <div className="flex gap-2">
+                                    <form 
+                                        onSubmit={(e) => {
+                                            e.preventDefault();
+                                            addLabToBatch();
+                                        }}
+                                        className="flex gap-2"
+                                    >
                                         <select value={newLab.test_name} onChange={e => setNewLab({ ...newLab, test_name: e.target.value, test_category: 'laboratory' })}
                                             className="flex-1 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm outline-none focus:border-brand-500 text-slate-900 dark:text-white">
                                             <option value="" disabled>Select Test...</option>
-                                            {LAB_TESTS.map(group => (
+                                            {(availableTests.length > 0 ? availableTests : LAB_TESTS).map(group => (
                                                 <optgroup key={group.category} label={group.category}>
-                                                    {group.tests.map(test => (
+                                                    {group.tests.map((test: string) => (
                                                         <option key={test} value={test}>{test}</option>
                                                     ))}
                                                 </optgroup>
@@ -966,10 +1034,10 @@ export default function ConsultationForm({ id: propId, embedded = false }: Consu
                                             <option value="urgent">Urgent</option>
                                             <option value="stat">STAT</option>
                                         </select>
-                                        <button onClick={addLabToBatch} className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-1">
+                                        <button type="submit" className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-1">
                                             <Plus className="w-3 h-3" /> Add
                                         </button>
-                                    </div>
+                                    </form>
                                 </div>
                             )}
 
@@ -980,7 +1048,25 @@ export default function ConsultationForm({ id: propId, embedded = false }: Consu
                                     {selectedInvestigations.filter(s => s !== 'laboratory').map(catId => {
                                         const cat = INVESTIGATION_CATEGORIES.find(c => c.id === catId);
                                         return (
-                                            <div key={catId} className="flex gap-2 items-center">
+                                            <form 
+                                                key={catId} 
+                                                onSubmit={(e) => {
+                                                    e.preventDefault();
+                                                    const input = document.getElementById(`inv-${catId}`) as HTMLInputElement;
+                                                    const priSelect = document.getElementById(`inv-pri-${catId}`) as HTMLSelectElement;
+                                                    if (input?.value.trim()) {
+                                                        setBatchLabs([...batchLabs, {
+                                                            id: Math.random().toString(36).substr(2, 9),
+                                                            test_name: input.value.trim(),
+                                                            test_category: catId,
+                                                            priority: priSelect?.value || 'routine',
+                                                            notes: '',
+                                                        }]);
+                                                        input.value = '';
+                                                    }
+                                                }}
+                                                className="flex gap-2 items-center"
+                                            >
                                                 <span className="text-lg w-8">{cat?.icon}</span>
                                                 <input
                                                     type="text"
@@ -994,26 +1080,12 @@ export default function ConsultationForm({ id: propId, embedded = false }: Consu
                                                     <option value="stat">STAT</option>
                                                 </select>
                                                 <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const input = document.getElementById(`inv-${catId}`) as HTMLInputElement;
-                                                        const priSelect = document.getElementById(`inv-pri-${catId}`) as HTMLSelectElement;
-                                                        if (input?.value.trim()) {
-                                                            setBatchLabs([...batchLabs, {
-                                                                id: Math.random().toString(36).substr(2, 9),
-                                                                test_name: input.value.trim(),
-                                                                test_category: catId,
-                                                                priority: priSelect?.value || 'routine',
-                                                                notes: '',
-                                                            }]);
-                                                            input.value = '';
-                                                        }
-                                                    }}
+                                                    type="submit"
                                                     className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-xl text-sm font-semibold flex items-center gap-1"
                                                 >
                                                     <Plus className="w-3 h-3" /> Add
                                                 </button>
-                                            </div>
+                                            </form>
                                         );
                                     })}
                                 </div>
@@ -1062,8 +1134,8 @@ export default function ConsultationForm({ id: propId, embedded = false }: Consu
                             {labs.length > 0 && (
                                 <div className="space-y-2">
                                     <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">Ordered Investigations</label>
-                                    {labs.map((lab: any) => (
-                                        <div key={lab.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
+                                    {labs.map((lab: any, idx: number) => (
+                                        <div key={`${lab.id}-${idx}`} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
                                             <div>
                                                 <p className="font-semibold text-sm text-slate-900 dark:text-white">{lab.test_name}</p>
                                                 <p className="text-xs text-slate-400">{lab.test_category || 'laboratory'} • {lab.status} • {lab.priority}</p>
@@ -1099,16 +1171,24 @@ export default function ConsultationForm({ id: propId, embedded = false }: Consu
                             {!isCompleted && (
                                 <div className="relative">
                                     <label className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1 block">Search ICD-10 Codes</label>
-                                    <div className="relative">
+                                    <form 
+                                        onSubmit={(e) => e.preventDefault()}
+                                        className="relative"
+                                    >
                                         <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                                         <input
                                             type="text"
                                             value={icdSearch}
                                             onChange={(e) => searchICD10(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && icdResults.length > 0) {
+                                                    selectICD10(icdResults[0]);
+                                                }
+                                            }}
                                             placeholder="Search by code or disease name..."
                                             className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:border-brand-500 text-slate-900 dark:text-white"
                                         />
-                                    </div>
+                                    </form>
 
                                     {icdResults.length > 0 && (
                                         <div className="absolute z-10 w-full mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 max-h-64 overflow-y-auto">
@@ -1180,11 +1260,11 @@ export default function ConsultationForm({ id: propId, embedded = false }: Consu
                     </Section>
 
                     {/* Section 4 — Prescription / Drugs */}
-                    <Section title={`Prescription / Drugs (${meds.length})`} icon={<Pill className="w-4 h-4 text-indigo-500" />} defaultOpen={true}>
+                    <Section title={`Prescription / Drugs (${meds.length}${batchMeds.length > 0 ? ` + ${batchMeds.length}` : ''})`} icon={<Pill className="w-4 h-4 text-indigo-500" />} defaultOpen={true}>
                         {meds.length > 0 && (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-4">
-                                {meds.map((med: any) => (
-                                    <div key={med.id} className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
+                                {meds.map((med: any, idx: number) => (
+                                    <div key={`${med.id}-${idx}`} className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200/50 dark:border-slate-800/50">
                                         <div>
                                             <p className="font-bold text-xs text-slate-900 dark:text-white uppercase tracking-tight">{med.medication_name}</p>
                                             <p className="text-[10px] text-slate-500 font-medium">{med.dosage} • {med.frequency} • {med.route}</p>
@@ -1200,17 +1280,25 @@ export default function ConsultationForm({ id: propId, embedded = false }: Consu
                             <div className="space-y-3">
                                 <div className="relative">
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">Search Hospital Pharma Inventory</label>
-                                    <div className="relative">
+                                    <form 
+                                        onSubmit={(e) => e.preventDefault()}
+                                        className="relative"
+                                    >
                                         <Search className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
                                         <input
                                             type="text"
                                             value={drugSearch}
                                             onChange={(e) => searchHospitalDrugs(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' && drugResults.length > 0) {
+                                                    selectInventoryDrug(drugResults[0]);
+                                                }
+                                            }}
                                             placeholder="Search drug by name or brand..."
                                             className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none focus:border-brand-500 text-slate-900 dark:text-white"
                                         />
                                         {searchingDrugs && <Loader2 className="absolute right-3 top-3 w-4 h-4 text-brand-500 animate-spin" />}
-                                    </div>
+                                    </form>
 
                                     {drugResults.length > 0 && (
                                         <div className="absolute z-50 w-full mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 max-h-64 overflow-y-auto custom-scrollbar">
@@ -1234,41 +1322,49 @@ export default function ConsultationForm({ id: propId, embedded = false }: Consu
                                     )}
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div className="relative">
-                                        <input list="doses" type="text" value={newMed.dosage} onChange={e => setNewMed({ ...newMed, dosage: e.target.value })}
-                                            placeholder="Dosage (e.g. 500mg)" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm outline-none focus:border-brand-500 text-slate-900 dark:text-white" />
-                                        <datalist id="doses">
-                                            {COMMON_DOSES.map(d => <option key={d} value={d} />)}
-                                        </datalist>
+                                <form 
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        addToBatch();
+                                    }}
+                                    className="space-y-3"
+                                >
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="relative">
+                                            <input list="doses" type="text" value={newMed.dosage} onChange={e => setNewMed({ ...newMed, dosage: e.target.value })}
+                                                placeholder="Dosage (e.g. 500mg)" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm outline-none focus:border-brand-500 text-slate-900 dark:text-white" />
+                                            <datalist id="doses">
+                                                {COMMON_DOSES.map(d => <option key={d} value={d} />)}
+                                            </datalist>
+                                        </div>
+                                        <div className="relative">
+                                            <input list="frequencies" type="text" value={newMed.frequency} onChange={e => setNewMed({ ...newMed, frequency: e.target.value })}
+                                                placeholder="Frequency (e.g. TDS)" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm outline-none focus:border-brand-500 text-slate-900 dark:text-white" />
+                                            <datalist id="frequencies">
+                                                {COMMON_FREQUENCIES.map(f => <option key={f} value={f} />)}
+                                            </datalist>
+                                        </div>
                                     </div>
-                                    <div className="relative">
-                                        <input list="frequencies" type="text" value={newMed.frequency} onChange={e => setNewMed({ ...newMed, frequency: e.target.value })}
-                                            placeholder="Frequency (e.g. TDS)" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm outline-none focus:border-brand-500 text-slate-900 dark:text-white" />
-                                        <datalist id="frequencies">
-                                            {COMMON_FREQUENCIES.map(f => <option key={f} value={f} />)}
-                                        </datalist>
+                                    <div className="flex gap-2">
+                                        <select value={newMed.route} onChange={e => setNewMed({ ...newMed, route: e.target.value })}
+                                            className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm outline-none text-slate-900 dark:text-white">
+                                            <option value="oral">Oral</option>
+                                            <option value="iv">IV</option>
+                                            <option value="im">IM</option>
+                                            <option value="topical">Topical</option>
+                                            <option value="inhalation">Inhalation</option>
+                                        </select>
+                                        <input type="text" value={newMed.instructions} onChange={e => setNewMed({ ...newMed, instructions: e.target.value })}
+                                            placeholder="Instructions..." className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm outline-none focus:border-brand-500 text-slate-900 dark:text-white" />
+                                        <button
+                                            type="submit"
+                                            disabled={!newMed.inventory_item_id || !newMed.dosage}
+                                            className="bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-1 whitespace-nowrap transition-all"
+                                        >
+                                            <Plus className="w-3 h-3" /> Add to Batch
+                                        </button>
                                     </div>
-                                </div>
-                                <div className="flex gap-2">
-                                    <select value={newMed.route} onChange={e => setNewMed({ ...newMed, route: e.target.value })}
-                                        className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm outline-none text-slate-900 dark:text-white">
-                                        <option value="oral">Oral</option>
-                                        <option value="iv">IV</option>
-                                        <option value="im">IM</option>
-                                        <option value="topical">Topical</option>
-                                        <option value="inhalation">Inhalation</option>
-                                    </select>
-                                    <input type="text" value={newMed.instructions} onChange={e => setNewMed({ ...newMed, instructions: e.target.value })}
-                                        placeholder="Instructions..." className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-sm outline-none focus:border-brand-500 text-slate-900 dark:text-white" />
-                                    <button
-                                        onClick={addToBatch}
-                                        disabled={!newMed.inventory_item_id || !newMed.dosage}
-                                        className="bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-1 whitespace-nowrap transition-all"
-                                    >
-                                        <Plus className="w-3 h-3" /> Add to Batch
-                                    </button>
-                                </div>
+                                </form>
 
                                 {/* Pending Batch List */}
                                 {batchMeds.length > 0 && (

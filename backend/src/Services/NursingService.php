@@ -33,6 +33,10 @@ class NursingService
                 'rr' => $vitalsData['respiratory_rate'] ?? $vitalsData['rr'] ?? null,
                 'spo2' => $vitalsData['spo2'] ?? null,
                 'weight' => $vitalsData['weight'] ?? null,
+                'intake_ml' => $vitalsData['intake_ml'] ?? null,
+                'output_ml' => $vitalsData['output_ml'] ?? null,
+                'output_type' => $vitalsData['output_type'] ?? null,
+                'notes' => $vitalsData['notes'] ?? null,
             ]);
         } else {
             $vitals = null;

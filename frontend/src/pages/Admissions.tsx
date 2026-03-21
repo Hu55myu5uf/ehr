@@ -12,8 +12,10 @@ import {
     Pill,
     Thermometer,
     Droplets,
-    Wind
+    Wind,
+    Stethoscope
 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import api from '../api/client';
 import TreatmentSheet from '../components/TreatmentSheet';
 import TreatmentCharts from '../components/TreatmentCharts';
@@ -68,6 +70,7 @@ interface ActivityItem {
 }
 
 export default function Admissions() {
+    const navigate = useNavigate();
     const [admissions, setAdmissions] = useState<Admission[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedEncounter, setSelectedEncounter] = useState<string | null>(null);
@@ -289,12 +292,20 @@ export default function Admissions() {
                                                         <Activity className="w-4 h-4" />
                                                         Current Status
                                                     </div>
-                                                    <button 
-                                                        onClick={() => setShowMonitoringModal(true)}
-                                                        className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-brand-600/20 transition-all flex items-center gap-2"
-                                                    >
-                                                        <Plus className="w-4 h-4" /> Record Vitals / IO
-                                                    </button>
+                                                    <div className="flex items-center gap-2">
+                                                        <button 
+                                                            onClick={() => navigate(`/consultations?id=${adm.encounter_id}`)}
+                                                            className="bg-white dark:bg-slate-800 border border-brand-500/30 text-brand-600 dark:text-brand-400 px-4 py-2 rounded-xl text-xs font-bold shadow-sm hover:bg-brand-50 transition-all flex items-center gap-2"
+                                                        >
+                                                            <Stethoscope className="w-4 h-4" /> Consultation
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => setShowMonitoringModal(true)}
+                                                            className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-lg shadow-brand-600/20 transition-all flex items-center gap-2"
+                                                        >
+                                                            <Plus className="w-4 h-4" /> Record Vitals / IO
+                                                        </button>
+                                                    </div>
                                                 </div>
                                                 <h2 className="text-3xl font-bold text-slate-900 dark:text-white uppercase">
                                                     {adm.first_name} {adm.last_name}

@@ -127,7 +127,9 @@ class ConsultationService
         $stmt = $conn->prepare("
             SELECT e.*, 
                 p.first_name, p.last_name, p.mrn, p.date_of_birth, p.gender, 
-                p.phone, p.email, p.next_of_kin_name, p.next_of_kin_phone, p.next_of_kin_relationship,
+                p.phone, p.email, p.emergency_contact_name AS next_of_kin_name, 
+                p.emergency_contact_phone AS next_of_kin_phone, 
+                p.emergency_contact_relationship AS next_of_kin_relationship,
                 pr.first_name AS doctor_first, pr.last_name AS doctor_last
             FROM encounters e
             JOIN patients p ON e.patient_id = p.id
@@ -150,6 +152,7 @@ class ConsultationService
             FROM lab_orders lo
             LEFT JOIN lab_results lr ON lr.lab_order_id = lo.id
             WHERE lo.encounter_id = :eid
+            GROUP BY lo.id
             ORDER BY lo.ordered_at DESC
         ");
         $labStmt->execute(['eid' => $encounterId]);

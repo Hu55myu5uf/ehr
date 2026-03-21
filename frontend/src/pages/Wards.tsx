@@ -10,7 +10,9 @@ import {
     TrendingUp,
     ShieldAlert,
     Bed,
-    Building2
+    Building2,
+    HeartPulse,
+    Activity
 } from 'lucide-react';
 import api from '../api/client';
 

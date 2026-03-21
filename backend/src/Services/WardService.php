@@ -60,7 +60,8 @@ class WardService
                     'gender' => $bed['gender'],
                     'diagnosis' => $bed['diagnosis'] ?? 'Under Observation',
                     'admittedAt' => $bed['admitted_at'],
-                    'acuity' => $bed['acuity']
+                    'acuity' => $bed['acuity'],
+                    'encounter_id' => $bed['encounter_id']
                 ];
             }
         }

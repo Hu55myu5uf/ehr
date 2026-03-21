@@ -37,14 +37,14 @@ class PriceListController
         }
 
         $data = json_decode(file_get_contents('php://input'), true);
-        if (!isset($data['item_type']) || !isset($data['price'])) {
+        if (!isset($data['id']) || !isset($data['price'])) {
             http_response_code(400);
             header('Content-Type: application/json');
             echo json_encode(['error' => 'Invalid data']);
             return;
         }
 
-        $this->priceService->updatePrice($data['item_type'], (float)$data['price']);
+        $this->priceService->updatePrice($data['id'], (float)$data['price']);
         header('Content-Type: application/json');
         echo json_encode(['message' => 'Price updated successfully']);
     }

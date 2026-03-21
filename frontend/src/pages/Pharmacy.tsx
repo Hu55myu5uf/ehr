@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Pill, Refrigerator, Search, AlertTriangle, Clock, CheckCircle2, Loader2, Package, ArrowRight, MinusCircle, X, Plus, Save, Trash2 } from 'lucide-react';
+import { Pill, Refrigerator, Search, AlertTriangle, Clock, CheckCircle2, Loader2, Package, ArrowRight, MinusCircle, X, Plus, Save, Trash2, Printer } from 'lucide-react';
 import api from '../api/client';
+import InvoiceModal from '../components/InvoiceModal';
 
 interface Prescription {
     id: string;
@@ -38,10 +39,16 @@ export default function Pharmacy() {
     const [patientPrescriptions, setPatientPrescriptions] = useState<any[]>([]);
     const [loadingPatientRx, setLoadingPatientRx] = useState(false);
     const [selectedPatientRx, setSelectedPatientRx] = useState<string[]>([]);
+    
+    // Invoice Print Modal State
+    const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+    const [generatedBill, setGeneratedBill] = useState<any>(null);
     const [selectedBatch, setSelectedBatch] = useState<BatchGroup | null>(null);
-    const [activeTab, setActiveTab] = useState<'pending' | 'patients' | 'inventory'>('pending');
+    const [activeTab, setActiveTab] = useState<'pending' | 'patients' | 'inventory' | 'history'>('patients');
     const [inventory, setInventory] = useState<any[]>([]);
     const [loadingInventory, setLoadingInventory] = useState(false);
+    const [historyPrescriptions, setHistoryPrescriptions] = useState<Prescription[]>([]);
+    const [loadingHistory, setLoadingHistory] = useState(false);
     const [newStockItem, setNewStockItem] = useState({ item_name: '', brand_name: '', category: '', quantity: 0, unit: 'Tabs', unit_price: 0 });
 
     const userStr = localStorage.getItem('user');
@@ -52,7 +59,23 @@ export default function Pharmacy() {
     useEffect(() => {
         if (activeTab === 'pending') fetchPrescriptions();
         if (activeTab === 'inventory') fetchInventory();
+        if (activeTab === 'patients') fetchAllPendingInvoices();
+        if (activeTab === 'history') fetchHistory();
     }, [activeTab]);
+
+    const fetchAllPendingInvoices = async () => {
+        try {
+            setLoadingPatientRx(true);
+            const res = await api.get('/pharmacy/invoicing/pending');
+            setPatientPrescriptions(res.data.prescriptions || []);
+            setSelectedPatientRx([]);
+            setPatientQuery(''); // Clear search when auto-loading
+        } catch (err) {
+            console.error('Failed to fetch all pending invoices', err);
+        } finally {
+            setLoadingPatientRx(false);
+        }
+    };
 
     const fetchPrescriptions = async () => {
         try {
@@ -78,6 +101,18 @@ export default function Pharmacy() {
         }
     };
 
+    const fetchHistory = async () => {
+        try {
+            setLoadingHistory(true);
+            const res = await api.get('/medications/history');
+            setHistoryPrescriptions(res.data.medications || []);
+        } catch (err) {
+            console.error('Failed to fetch medication history', err);
+        } finally {
+            setLoadingHistory(false);
+        }
+    };
+
     const handleSearchPatient = async () => {
         if (!patientQuery.trim()) return;
         try {
@@ -96,12 +131,25 @@ export default function Pharmacy() {
     const handleGenerateInvoice = async () => {
         if (selectedPatientRx.length === 0) return;
         try {
+            const firstSelected = patientPrescriptions.find(rx => rx.id === selectedPatientRx[0]);
+            if (!firstSelected) return;
+
             const res = await api.post('/pharmacy/invoice', {
-                patient_id: patientPrescriptions[0].patient_id,
+                patient_id: firstSelected.patient_id,
                 medication_ids: selectedPatientRx
             });
-            alert('Invoice generated and sent to billing!');
-            handleSearchPatient();
+            
+            if (res.data.bill) {
+                setGeneratedBill(res.data.bill);
+                setShowInvoiceModal(true);
+                setSelectedPatientRx([]);
+                if (patientQuery) handleSearchPatient();
+                else fetchAllPendingInvoices();
+            } else {
+                alert('Invoice generated and sent to billing!');
+                if (patientQuery) handleSearchPatient();
+                else fetchAllPendingInvoices();
+            }
         } catch (err) {
             alert('Failed to generate invoice');
         }
@@ -192,16 +240,16 @@ export default function Pharmacy() {
             <div className="flex items-center justify-between bg-white dark:bg-slate-900/50 p-2 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
                 <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl overflow-x-auto scrollbar-hidden">
                     <button
-                        onClick={() => setActiveTab('pending')}
-                        className={`px-4 py-2 rounded-lg text-[13px] font-bold transition-all whitespace-nowrap ${activeTab === 'pending' ? 'bg-white dark:bg-slate-700 text-brand-600 dark:text-brand-400 shadow-sm' : 'text-slate-500'}`}
-                    >
-                        Dispensing Queue
-                    </button>
-                    <button
                         onClick={() => setActiveTab('patients')}
                         className={`px-4 py-2 rounded-lg text-[13px] font-bold transition-all whitespace-nowrap ${activeTab === 'patients' ? 'bg-white dark:bg-slate-700 text-brand-600 dark:text-brand-400 shadow-sm' : 'text-slate-500'}`}
                     >
                         Invoicing
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('pending')}
+                        className={`px-4 py-2 rounded-lg text-[13px] font-bold transition-all whitespace-nowrap ${activeTab === 'pending' ? 'bg-white dark:bg-slate-700 text-brand-600 dark:text-brand-400 shadow-sm' : 'text-slate-500'}`}
+                    >
+                        Dispensing Queue
                     </button>
                     <button
                         onClick={() => setActiveTab('inventory')}
@@ -209,9 +257,15 @@ export default function Pharmacy() {
                     >
                         Drug Inventory
                     </button>
+                    <button
+                        onClick={() => setActiveTab('history')}
+                        className={`px-4 py-2 rounded-lg text-[13px] font-bold transition-all whitespace-nowrap ${activeTab === 'history' ? 'bg-white dark:bg-slate-700 text-brand-600 dark:text-brand-400 shadow-sm' : 'text-slate-500'}`}
+                    >
+                        History
+                    </button>
                 </div>
                 {activeTab !== 'patients' && (
-                    <div className="relative flex-1 max-w-md">
+                    <form onSubmit={(e) => e.preventDefault()} className="relative flex-1 max-w-md">
                         <Search className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
                         <input
                             type="text"
@@ -220,7 +274,7 @@ export default function Pharmacy() {
                             onChange={(e) => setSearch(e.target.value)}
                             className="w-full bg-transparent border-none outline-none pl-10 pr-4 py-2.5 text-slate-900 dark:text-white placeholder-slate-500"
                         />
-                    </div>
+                    </form>
                 )}
             </div>
 
@@ -242,6 +296,12 @@ export default function Pharmacy() {
                         <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                             <Search className="w-5 h-5 text-brand-500" />
                             Patient Lookup
+                        </h2>
+                    )}
+                    {activeTab === 'history' && (
+                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                            <Clock className="w-5 h-5 text-brand-500" />
+                            Dispensing History
                         </h2>
                     )}
 
@@ -308,7 +368,13 @@ export default function Pharmacy() {
                         <div className="space-y-6">
                             <div className="bg-white dark:bg-slate-900/40 p-6 rounded-3xl border border-slate-200 dark:border-slate-800">
                                 <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Patient Lookup (ID/MRN)</label>
-                                <div className="flex gap-3">
+                                <form 
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        handleSearchPatient();
+                                    }} 
+                                    className="flex gap-3"
+                                >
                                     <input
                                         type="text"
                                         placeholder="Enter Patient ID..."
@@ -317,12 +383,12 @@ export default function Pharmacy() {
                                         className="flex-1 bg-slate-100 dark:bg-slate-800 border-none rounded-2xl px-5 py-4 text-slate-900 dark:text-white"
                                     />
                                     <button
-                                        onClick={handleSearchPatient}
+                                        type="submit"
                                         className="bg-brand-600 hover:bg-brand-500 text-white px-8 rounded-2xl font-bold transition-all shadow-lg shadow-brand-600/20"
                                     >
                                         Search
                                     </button>
-                                </div>
+                                </form>
                             </div>
 
                             {loadingPatientRx ? (
@@ -332,7 +398,9 @@ export default function Pharmacy() {
                             ) : patientPrescriptions.length > 0 ? (
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between px-2">
-                                        <h3 className="font-bold text-slate-900 dark:text-white">Pending Prescriptions for {patientPrescriptions[0].patient_first}</h3>
+                                        <h3 className="font-bold text-slate-900 dark:text-white">
+                                            {patientQuery ? `Pending Prescriptions for ${patientPrescriptions[0].patient_first}` : 'All Pending Invoices'}
+                                        </h3>
                                         <button
                                             onClick={handleGenerateInvoice}
                                             disabled={selectedPatientRx.length === 0}
@@ -358,6 +426,18 @@ export default function Pharmacy() {
                                                     <div
                                                         key={batchKey}
                                                         onClick={() => {
+                                                            const patientId = batchItems[0].patient_id;
+                                                            const alreadySelectedPatientId = selectedPatientRx.length > 0 
+                                                                ? patientPrescriptions.find(rx => rx.id === selectedPatientRx[0])?.patient_id 
+                                                                : null;
+
+                                                            if (alreadySelectedPatientId && alreadySelectedPatientId !== patientId) {
+                                                                if (window.confirm('Selection changed to a different patient. Clear previous selection?')) {
+                                                                    setSelectedPatientRx(allIds);
+                                                                }
+                                                                return;
+                                                            }
+
                                                             if (allSelected) {
                                                                 setSelectedPatientRx(selectedPatientRx.filter(id => !allIds.includes(id)));
                                                             } else {
@@ -376,6 +456,10 @@ export default function Pharmacy() {
                                                                 </div>
                                                                 <div>
                                                                     <p className="font-bold text-slate-900 dark:text-white uppercase">
+                                                                        {batchItems[0].patient_first} {batchItems[0].patient_last}
+                                                                    </p>
+                                                                    <p className="text-[10px] font-mono text-slate-400">{batchItems[0].mrn}</p>
+                                                                    <p className="text-xs font-bold text-brand-600 dark:text-brand-400 mt-1 uppercase">
                                                                         {batchItems.length > 1 ? `Batch (${batchItems.length} meds)` : batchItems[0].medication_name}
                                                                     </p>
                                                                     <p className="text-xs text-slate-500">{batchItems[0].billing_status?.replace('_', ' ')}</p>
@@ -399,9 +483,9 @@ export default function Pharmacy() {
                                         })()}
                                     </div>
                                 </div>
-                            ) : patientQuery && (
+                            ) : (
                                 <div className="py-20 text-center bg-slate-100 dark:bg-slate-800/30 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800">
-                                    <p className="text-slate-500">No pending prescriptions found for this patient ID.</p>
+                                    <p className="text-slate-500">No pending prescriptions found.</p>
                                 </div>
                             )}
                         </div>
@@ -409,7 +493,9 @@ export default function Pharmacy() {
 
                     {activeTab === 'inventory' && (
                         <div className="space-y-6">
+                            {/* Inventory content ... */}
                             <div className="bg-white dark:bg-slate-900/40 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                                {/* Inventory Table UI */}
                                 <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
                                     <h3 className="font-bold text-slate-900 dark:text-white">Manage Drug Stock</h3>
                                     <button
@@ -419,7 +505,13 @@ export default function Pharmacy() {
                                         <Clock className="w-5 h-5" />
                                     </button>
                                 </div>
-                                <div className="p-6 bg-slate-50 dark:bg-slate-800/20 border-b border-slate-100 dark:border-slate-800">
+                                <form 
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        handleAddStock();
+                                    }} 
+                                    className="p-6 bg-slate-50 dark:bg-slate-800/20 border-b border-slate-100 dark:border-slate-800"
+                                >
                                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Drug Name</label>
@@ -473,14 +565,14 @@ export default function Pharmacy() {
                                         </div>
                                         <div className="flex items-end">
                                             <button
-                                                onClick={handleAddStock}
+                                                type="submit"
                                                 className="w-full bg-brand-600 hover:bg-brand-500 text-white rounded-xl font-bold py-3 shadow-lg shadow-brand-600/20 transition-all"
                                             >
                                                 Add Item
                                             </button>
                                         </div>
                                     </div>
-                                </div>
+                                </form>
                                 <div className="overflow-x-auto scrollbar-slim">
                                     <table className="w-full text-sm">
                                         <thead>
@@ -529,6 +621,48 @@ export default function Pharmacy() {
                                                     </td>
                                                 </tr>
                                             ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'history' && (
+                        <div className="space-y-6">
+                            <div className="bg-white dark:bg-slate-900/40 rounded-3xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                                <div className="overflow-x-auto scrollbar-slim">
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 text-[10px] font-black uppercase tracking-widest whitespace-nowrap">
+                                                <th className="text-left px-6 py-4">Patient</th>
+                                                <th className="text-left px-6 py-4">Medication</th>
+                                                <th className="text-left px-6 py-4">Dosage</th>
+                                                <th className="text-left px-6 py-4">Dispensed At</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                            {loadingHistory ? (
+                                                <tr><td colSpan={4} className="py-20 text-center"><Loader2 className="w-8 h-8 text-brand-500 animate-spin mx-auto" /></td></tr>
+                                            ) : historyPrescriptions.length === 0 ? (
+                                                <tr><td colSpan={4} className="py-20 text-center text-slate-500 font-bold uppercase text-[10px]">No dispensing history found</td></tr>
+                                            ) : (
+                                                historyPrescriptions.filter(p => 
+                                                    p.patient_first.toLowerCase().includes(search.toLowerCase()) || 
+                                                    p.patient_last.toLowerCase().includes(search.toLowerCase()) ||
+                                                    p.medication_name.toLowerCase().includes(search.toLowerCase())
+                                                ).map(med => (
+                                                    <tr key={med.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors">
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <p className="font-bold text-slate-900 dark:text-white uppercase text-[12px]">{med.patient_first} {med.patient_last}</p>
+                                                            <p className="text-[9px] text-slate-400 font-mono italic">{med.mrn}</p>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-xs font-bold text-brand-600 dark:text-brand-400 uppercase">{med.medication_name}</td>
+                                                        <td className="px-6 py-4 text-slate-500 whitespace-nowrap text-xs">{med.dosage}</td>
+                                                        <td className="px-6 py-4 text-slate-400 whitespace-nowrap text-[10px] font-mono">{new Date(med.created_at).toLocaleString()}</td>
+                                                    </tr>
+                                                ))
+                                            )}
                                         </tbody>
                                     </table>
                                 </div>
@@ -592,26 +726,15 @@ export default function Pharmacy() {
                         </div>
                     )}
 
-                    <div className="p-5 bg-brand-500/5 border border-brand-500/20 rounded-3xl">
-                        <div className="flex items-center gap-3 mb-3">
-                            <AlertTriangle className="w-5 h-5 text-brand-500" />
-                            <h4 className="font-bold text-brand-500 text-sm">Pharmacy Alerts</h4>
-                        </div>
-                        <ul className="space-y-2">
-                            <li className="text-xs text-slate-600 dark:text-slate-400 flex items-start gap-2">
-                                <MinusCircle className="w-3 h-3 mt-0.5" />
-                                2 patients have unclaimed stat prescriptions.
-                            </li>
-                            <li className="text-xs text-slate-600 dark:text-slate-400 flex items-start gap-2">
-                                <MinusCircle className="w-3 h-3 mt-0.5" />
-                                Amoxicillin stock level is low (12% remaining).
-                            </li>
-                        </ul>
-                    </div>
                 </div>
             </div>
 
             {/* Stock Control Notification removed since it is now a tab */}
+            <InvoiceModal 
+                isOpen={showInvoiceModal}
+                onClose={() => setShowInvoiceModal(false)}
+                bill={generatedBill}
+            />
         </div>
     );
 }

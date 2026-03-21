@@ -283,18 +283,21 @@ class LabService
         }
 
         try {
+            $resultId = \Ramsey\Uuid\Uuid::uuid4()->toString();
+
             $stmt = $this->db->prepare("
                 INSERT INTO lab_results (
                     id, lab_order_id, result_name, result_value, result_unit,
                     reference_range, abnormal_flag, notes, performed_by, performed_at
                 )
                 VALUES (
-                    UUID(), :lab_order_id, :result_name, :result_value, :result_unit,
+                    :id, :lab_order_id, :result_name, :result_value, :result_unit,
                     :reference_range, :abnormal_flag, :notes, :performed_by, NOW()
                 )
             ");
 
             $stmt->execute([
+                'id' => $resultId,
                 'lab_order_id' => $data['lab_order_id'],
                 'result_name' => $data['result_name'],
                 'result_value' => $data['result_value'],
@@ -309,7 +312,6 @@ class LabService
             $status = ($data['complete'] ?? false) ? 'completed' : 'in_progress';
             $this->updateLabOrderStatus($data['lab_order_id'], $status, $userId);
 
-            $resultId = $this->db->lastInsertId();
             $result = $this->getLabResultById($resultId);
 
             // Audit log

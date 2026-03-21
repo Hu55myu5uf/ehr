@@ -46,6 +46,7 @@ export default function Insurance() {
     const [claims, setClaims] = useState<Claim[]>([]);
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState<'dashboard' | 'providers' | 'claims'>('dashboard');
+    const [providerSearch, setProviderSearch] = useState('');
     const [showModal, setShowModal] = useState(false);
     const [currentProvider, setCurrentProvider] = useState<Partial<Provider>>({ status: 'active' });
 
@@ -249,14 +250,19 @@ export default function Insurance() {
             {view === 'providers' && (
                 <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-200 dark:border-slate-800 p-8 shadow-sm space-y-8">
                      <div className="flex items-center justify-between">
-                        <div className="relative w-72">
+                         <form 
+                            onSubmit={(e) => e.preventDefault()} 
+                            className="relative w-72"
+                        >
                             <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                             <input 
                                 type="text"
                                 placeholder="Search providers..."
+                                value={providerSearch}
+                                onChange={e => setProviderSearch(e.target.value)}
                                 className="w-full bg-slate-50 dark:bg-slate-800 border-none rounded-2xl pl-11 pr-4 py-3 text-sm focus:ring-2 focus:ring-brand-500/20 transition-all"
                             />
-                        </div>
+                        </form>
                         <button 
                             onClick={() => {
                                 setCurrentProvider({ status: 'active' });
@@ -270,7 +276,11 @@ export default function Insurance() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                        {providers.map(p => (
+                        {providers.filter(p => 
+                            p.name.toLowerCase().includes(providerSearch.toLowerCase()) ||
+                            (p.email && p.email.toLowerCase().includes(providerSearch.toLowerCase())) ||
+                            (p.phone && p.phone.includes(providerSearch))
+                        ).map(p => (
                             <div key={p.id} className="bg-slate-50 dark:bg-slate-800/30 p-6 rounded-[2rem] border border-slate-200 dark:border-slate-700 relative group overflow-hidden">
                                 <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button 

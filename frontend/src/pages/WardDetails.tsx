@@ -17,7 +17,8 @@ import {
     RefreshCw,
     Syringe,
     Brain,
-    ShieldAlert
+    ShieldAlert,
+    Stethoscope
 } from 'lucide-react';
 import api from '../api/client';
 
@@ -33,6 +34,7 @@ interface Bed {
         diagnosis: string;
         admittedAt: string;
         acuity: 'stable' | 'serious' | 'critical';
+        encounter_id: string;
     };
     vitals?: any;
     admission_id?: string;
@@ -254,6 +256,13 @@ export default function WardDetails() {
                             </div>
 
                             <div className="mt-auto pt-8 space-y-3">
+                                <button
+                                    onClick={() => navigate(`/consultations?id=${selectedBed.patient?.encounter_id}`)}
+                                    className="w-full bg-brand-600 hover:bg-brand-700 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-brand-600/20 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Stethoscope className="w-4 h-4" />
+                                    Start Consultation
+                                </button>
                                 <button
                                     onClick={() => navigate(`/admissions`)} // Navigate to monitoring view
                                     className="w-full bg-slate-900 hover:bg-slate-800 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-2"

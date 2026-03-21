@@ -55,7 +55,8 @@ const SPECIALIZATIONS = [
     'Neurology',
     'Gastroenterology',
     'Oncology',
-    'Endocrinology'
+    'Endocrinology',
+    'Dentist'
 ];
 
 export default function UserManagement() {
@@ -236,13 +237,15 @@ export default function UserManagement() {
             {/* Search */}
             <div className="flex items-center gap-4 bg-slate-100 dark:bg-slate-900/50 p-2 rounded-2xl border border-slate-200 dark:border-slate-800">
                 <Search className="w-5 h-5 text-slate-400 ml-3" />
-                <input
-                    type="text"
-                    placeholder="Search users by name, email, or role..."
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    className="w-full bg-transparent outline-none text-slate-900 dark:text-white placeholder-slate-400 text-sm py-2"
-                />
+                <form onSubmit={(e) => e.preventDefault()} className="w-full">
+                    <input
+                        type="text"
+                        placeholder="Search users by name, email, or role..."
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        className="w-full bg-transparent outline-none text-slate-900 dark:text-white placeholder-slate-400 text-sm py-2"
+                    />
+                </form>
             </div>
 
             {/* User Table */}
@@ -269,7 +272,7 @@ export default function UserManagement() {
                                         <div className="flex items-center gap-3">
                                             <div className="w-8 h-8 rounded-xl bg-brand-500/10 flex items-center justify-center text-brand-500 font-black text-xs overflow-hidden border border-brand-500/20 shadow-sm shrink-0">
                                                 {user.profile_picture ? (
-                                                    <img src={`http://localhost:5173/api/uploads/profiles/${user.profile_picture}`} alt="" className="w-full h-full object-cover" />
+                                                    <img src={`/uploads/profiles/${user.profile_picture}`} alt="" className="w-full h-full object-cover" />
                                                 ) : (
                                                     (user.full_name || user.username).charAt(0).toUpperCase()
                                                 )}

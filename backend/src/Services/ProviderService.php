@@ -44,10 +44,12 @@ class ProviderService
     {
         try {
             $stmt = $this->db->prepare("
-                SELECT id, user_id, first_name, last_name, specialty, credentials
-                FROM providers 
-                WHERE deleted_at IS NULL 
-                ORDER BY first_name ASC
+                SELECT p.id, p.user_id, p.first_name, p.last_name, p.specialty, p.credentials
+                FROM providers p
+                JOIN users u ON p.user_id = u.id
+                WHERE p.deleted_at IS NULL 
+                AND u.role = 'doctor'
+                ORDER BY p.first_name ASC
             ");
             $stmt->execute();
             return $stmt->fetchAll(PDO::FETCH_ASSOC);

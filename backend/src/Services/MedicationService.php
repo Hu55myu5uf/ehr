@@ -514,4 +514,29 @@ class MedicationService
             throw new \RuntimeException("Failed to mark medications as invoiced: " . $e->getMessage());
         }
     }
+
+    /**
+     * Get medications pending invoicing across all patients
+     */
+    public function getInvoicingQueue(): array
+    {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT m.*, 
+                       p.first_name as patient_first, p.last_name as patient_last, p.mrn,
+                       pr.first_name as provider_first, pr.last_name as provider_last
+                FROM medications m
+                JOIN patients p ON m.patient_id = p.id
+                LEFT JOIN providers pr ON m.prescribed_by = pr.id
+                WHERE m.billing_status = 'pending_invoice'
+                  AND m.deleted_at IS NULL
+                ORDER BY m.created_at ASC
+            ");
+
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            throw new \RuntimeException("Failed to fetch invoicing queue: " . $e->getMessage());
+        }
+    }
 }

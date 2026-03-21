@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Beaker, FlaskConical, Search, Clock, FileText, CheckCircle2, AlertCircle, Loader2, Plus, ArrowRight, XCircle } from 'lucide-react';
+import { Beaker, FlaskConical, Search, Clock, FileText, CheckCircle2, AlertCircle, Loader2, Plus, ArrowRight, XCircle, Printer, UserPlus } from 'lucide-react';
 import api from '../api/client';
+import InvoiceModal from '../components/InvoiceModal';
+import WalkInModal from '../components/WalkInModal';
 
 interface LabOrder {
     id: string;
@@ -91,7 +93,9 @@ export default function Laboratory() {
         notes: ''
     });
 
-    const [activeTab, setActiveTab] = useState<'pending' | 'invoicing' | 'completed'>('pending');
+    const [isWalkInModalOpen, setIsWalkInModalOpen] = useState(false);
+
+    const [activeTab, setActiveTab] = useState<'pending' | 'invoicing' | 'completed'>('invoicing');
 
     // Track selected batch key for the detail panel
     const [selectedBatchKey, setSelectedBatchKey] = useState<string | null>(null);
@@ -101,6 +105,10 @@ export default function Laboratory() {
     const [patientOrders, setPatientOrders] = useState<any[]>([]);
     const [loadingPatientOrders, setLoadingPatientOrders] = useState(false);
     const [selectedPatientOrders, setSelectedPatientOrders] = useState<string[]>([]);
+    
+    // Invoice Print Modal State
+    const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+    const [generatedBill, setGeneratedBill] = useState<any>(null);
 
     const userStr = localStorage.getItem('user');
     const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : {};
@@ -108,7 +116,24 @@ export default function Laboratory() {
 
     useEffect(() => {
         fetchOrders();
+        if (activeTab === 'invoicing') {
+            fetchAllPendingInvoices();
+        }
     }, [activeTab]);
+
+    const fetchAllPendingInvoices = async () => {
+        try {
+            setLoadingPatientOrders(true);
+            const res = await api.get('/labs/invoicing/pending');
+            setPatientOrders(res.data.orders || []);
+            setSelectedPatientOrders([]);
+            setPatientQuery(''); // Clear search when auto-loading
+        } catch (err) {
+            console.error('Failed to fetch all pending invoices', err);
+        } finally {
+            setLoadingPatientOrders(false);
+        }
+    };
 
     const fetchOrders = async () => {
         try {
@@ -179,6 +204,20 @@ export default function Laboratory() {
         }
     };
 
+    const handleWalkInSuccess = async (patientData: any) => {
+        try {
+            setIsOrdering(true);
+            const res = await api.post('/api/patients/walk-in', patientData);
+            setSelectedPatient(res.data);
+            setIsWalkInModalOpen(false);
+            setIsOrderModalOpen(true);
+        } catch (err: any) {
+            alert(err.response?.data?.error || 'Failed to register walk-in patient');
+        } finally {
+            setIsOrdering(false);
+        }
+    };
+
     const handleStatusUpdate = async (id: string, status: string) => {
         try {
             await api.patch(`/labs/orders/${id}/status`, { status });
@@ -207,12 +246,23 @@ export default function Laboratory() {
     const handleGenerateInvoice = async () => {
         if (selectedPatientOrders.length === 0) return;
         try {
-            await api.post('/labs/invoice', {
-                patient_id: patientOrders[0].patient_id,
+            const firstSelected = patientOrders.find(o => o.id === selectedPatientOrders[0]);
+            if (!firstSelected) return;
+
+            const res = await api.post('/labs/invoice', {
+                patient_id: firstSelected.patient_id,
                 order_ids: selectedPatientOrders
             });
-            alert('Invoice generated and sent to billing!');
-            handleSearchPatient();
+
+            if (res.data.bill) {
+                setGeneratedBill(res.data.bill);
+                setShowInvoiceModal(true);
+                setSelectedPatientOrders([]);
+                handleSearchPatient();
+            } else {
+                alert('Invoice generated and sent to billing!');
+                handleSearchPatient();
+            }
         } catch (err) {
             alert('Failed to generate invoice');
         }
@@ -290,31 +340,18 @@ export default function Laboratory() {
                         <Plus className="w-5 h-5" />
                         New Test Order
                     </button>
+                    <button
+                        onClick={() => setIsWalkInModalOpen(true)}
+                        className="flex items-center gap-2 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 dark:hover:bg-slate-700 px-4 py-2.5 rounded-xl font-semibold text-white transition-all shadow-lg"
+                    >
+                        <UserPlus className="w-4 h-4 text-brand-500" />
+                        Walk-in
+                    </button>
                 </div>
             </div>
 
-            <div className="flex items-center gap-4 bg-white dark:bg-slate-900/50 p-2 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-3 w-5 h-5 text-slate-400" />
-                    <input
-                        type="text"
-                        placeholder="Search orders..."
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        className="w-full bg-transparent border-none outline-none pl-10 pr-4 py-2.5 text-slate-900 dark:text-white placeholder-slate-500"
-                    />
-                </div>
-            </div>
 
             <div className="flex items-center gap-2 p-1 bg-slate-100 dark:bg-slate-900 rounded-2xl w-fit overflow-x-auto scrollbar-hidden">
-                <button
-                    onClick={() => setActiveTab('pending')}
-                    className={`px-6 py-2 rounded-xl text-[13px] font-bold transition-all whitespace-nowrap ${activeTab === 'pending'
-                        ? 'bg-white dark:bg-slate-800 text-brand-600 shadow-sm'
-                        : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                    Laboratory Queue
-                </button>
                 <button
                     onClick={() => setActiveTab('invoicing')}
                     className={`px-6 py-2 rounded-xl text-[13px] font-bold transition-all whitespace-nowrap ${activeTab === 'invoicing'
@@ -322,6 +359,14 @@ export default function Laboratory() {
                         : 'text-slate-500 hover:text-slate-700'}`}
                 >
                     Invoicing
+                </button>
+                <button
+                    onClick={() => setActiveTab('pending')}
+                    className={`px-6 py-2 rounded-xl text-[13px] font-bold transition-all whitespace-nowrap ${activeTab === 'pending'
+                        ? 'bg-white dark:bg-slate-800 text-brand-600 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    Laboratory Queue
                 </button>
                 <button
                     onClick={() => setActiveTab('completed')}
@@ -338,21 +383,21 @@ export default function Laboratory() {
                     <div className="lg:col-span-3 space-y-6">
                         <div className="bg-white dark:bg-slate-900/40 p-6 rounded-3xl border border-slate-200 dark:border-slate-800">
                             <label className="block text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Patient Lookup (ID/MRN)</label>
-                            <div className="flex gap-3">
-                                <input
-                                    type="text"
-                                    placeholder="Enter Patient ID..."
-                                    value={patientQuery}
-                                    onChange={(e) => setPatientQuery(e.target.value)}
-                                    className="flex-1 bg-slate-100 dark:bg-slate-800 border-none rounded-2xl px-5 py-4 text-slate-900 dark:text-white"
-                                />
-                                <button
-                                    onClick={handleSearchPatient}
-                                    className="bg-brand-600 hover:bg-brand-500 text-white px-8 rounded-2xl font-bold transition-all shadow-lg shadow-brand-600/20"
-                                >
-                                    Search
-                                </button>
-                            </div>
+                        <form onSubmit={(e) => { e.preventDefault(); handleSearchPatient(); }} className="flex gap-3">
+                            <input
+                                type="text"
+                                placeholder="Enter Patient ID..."
+                                value={patientQuery}
+                                onChange={(e) => setPatientQuery(e.target.value)}
+                                className="flex-1 bg-slate-100 dark:bg-slate-800 border-none rounded-2xl px-5 py-4 text-slate-900 dark:text-white"
+                            />
+                            <button
+                                type="submit"
+                                className="bg-brand-600 hover:bg-brand-500 text-white px-8 rounded-2xl font-bold transition-all shadow-lg shadow-brand-600/20"
+                            >
+                                Search
+                            </button>
+                        </form>
                         </div>
 
                         {loadingPatientOrders ? (
@@ -362,7 +407,9 @@ export default function Laboratory() {
                         ) : patientOrders.length > 0 ? (
                             <div className="space-y-4">
                                 <div className="flex items-center justify-between px-2">
-                                    <h3 className="font-bold text-slate-900 dark:text-white">Ordered Tests for {patientOrders[0].patient_first} {patientOrders[0].patient_last}</h3>
+                                    <h3 className="font-bold text-slate-900 dark:text-white">
+                                        {patientQuery ? `Ordered Tests for ${patientOrders[0].patient_first} ${patientOrders[0].patient_last}` : 'All Pending Invoices'}
+                                    </h3>
                                     <button
                                         onClick={handleGenerateInvoice}
                                         disabled={selectedPatientOrders.length === 0}
@@ -387,6 +434,18 @@ export default function Laboratory() {
                                                 <div
                                                     key={batchKey}
                                                     onClick={() => {
+                                                        const patientId = batchItems[0].patient_id;
+                                                        const alreadySelectedPatientId = selectedPatientOrders.length > 0 
+                                                            ? patientOrders.find(o => o.id === selectedPatientOrders[0])?.patient_id 
+                                                            : null;
+
+                                                        if (alreadySelectedPatientId && alreadySelectedPatientId !== patientId) {
+                                                            if (window.confirm('Selection changed to a different patient. Clear previous selection?')) {
+                                                                setSelectedPatientOrders(allIds);
+                                                            }
+                                                            return;
+                                                        }
+
                                                         if (allSelected) {
                                                             setSelectedPatientOrders(selectedPatientOrders.filter(id => !allIds.includes(id)));
                                                         } else {
@@ -405,6 +464,10 @@ export default function Laboratory() {
                                                             </div>
                                                             <div>
                                                                 <p className="font-bold text-slate-900 dark:text-white uppercase">
+                                                                    {batchItems[0].patient_first} {batchItems[0].patient_last}
+                                                                </p>
+                                                                <p className="text-[10px] font-mono text-slate-400">{batchItems[0].mrn}</p>
+                                                                <p className="text-xs font-bold text-brand-600 dark:text-brand-400 mt-1 uppercase">
                                                                     {batchItems.length > 1 ? `Batch (${batchItems.length} tests)` : batchItems[0].test_name}
                                                                 </p>
                                                                 <p className="text-xs text-slate-500">{batchItems[0].priority} priority</p>
@@ -425,9 +488,9 @@ export default function Laboratory() {
                                     })()}
                                 </div>
                             </div>
-                        ) : patientQuery && (
+                        ) : (
                             <div className="py-20 text-center bg-slate-100 dark:bg-slate-800/30 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800">
-                                <p className="text-slate-500">No pending test orders found for this patient.</p>
+                                <p className="text-slate-500">No pending test orders found.</p>
                             </div>
                         )}
                     </div>
@@ -822,6 +885,16 @@ export default function Laboratory() {
                                             placeholder="Search by name or ID..."
                                             value={patientSearch}
                                             onChange={e => setPatientSearch(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    const filtered = patients.filter(p => 
+                                                        `${p.first_name} ${p.last_name}`.toLowerCase().includes(patientSearch.toLowerCase()) || 
+                                                        p.patient_number?.toLowerCase().includes(patientSearch.toLowerCase())
+                                                    );
+                                                    if (filtered.length > 0) setSelectedPatient(filtered[0]);
+                                                }
+                                            }}
                                             className="w-full bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-sm outline-none focus:border-brand-500 text-slate-900 dark:text-white"
                                         />
                                     </div>
@@ -925,6 +998,20 @@ export default function Laboratory() {
                     </div>
                 </div>
             )}
+            {showInvoiceModal && generatedBill && (
+                <InvoiceModal
+                    isOpen={showInvoiceModal}
+                    bill={generatedBill}
+                    onClose={() => setShowInvoiceModal(false)}
+                />
+            )}
+
+            <WalkInModal 
+                isOpen={isWalkInModalOpen}
+                onClose={() => setIsWalkInModalOpen(false)}
+                onSuccess={handleWalkInSuccess}
+                title="Walk-in Lab Order"
+            />
         </div>
     );
 }

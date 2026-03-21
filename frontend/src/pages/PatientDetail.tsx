@@ -16,8 +16,10 @@ import {
     Loader2,
     HeartPulse,
     Shield,
-    Edit
+    Edit,
+    Wallet
 } from 'lucide-react';
+import PatientWallet from '../components/PatientWallet';
 
 interface Patient {
     id: string;
@@ -34,6 +36,8 @@ interface Patient {
     insurance_provider_id?: string;
     insurance_policy_number?: string;
     provider_name?: string;
+    profile_picture?: string;
+    wallet_balance?: string;
     created_at: string;
 }
 
@@ -51,7 +55,7 @@ export default function PatientDetail() {
     const { id } = useParams<{ id: string }>();
     const [patient, setPatient] = useState<Patient | null>(null);
     const [encounters, setEncounters] = useState<Encounter[]>([]);
-    const [activeTab, setActiveTab] = useState<'overview' | 'encounters' | 'labs' | 'meds'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'encounters' | 'labs' | 'meds' | 'wallet'>('overview');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [labs, setLabs] = useState<any[]>([]);
@@ -130,6 +134,7 @@ export default function PatientDetail() {
         { id: 'encounters' as const, label: 'Consultations', icon: Stethoscope },
         { id: 'labs' as const, label: 'Lab Results', icon: Beaker },
         { id: 'meds' as const, label: 'Medications', icon: Pill },
+        { id: 'wallet' as const, label: 'Wallet', icon: Wallet },
     ];
 
     if (loading) {
@@ -162,8 +167,16 @@ export default function PatientDetail() {
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-8 shadow-sm">
                 <div className="flex items-start justify-between">
                     <div className="flex items-center gap-6">
-                        <div className="w-20 h-20 rounded-2xl bg-brand-500/10 flex items-center justify-center text-brand-500 font-bold text-3xl">
-                            {patient.first_name.charAt(0)}{patient.last_name.charAt(0)}
+                        <div className="w-20 h-20 rounded-2xl bg-brand-500/10 flex items-center justify-center text-brand-500 font-bold text-3xl overflow-hidden">
+                            {patient.profile_picture ? (
+                                <img 
+                                    src={`${api.defaults.baseURL?.replace('/api', '')}/${patient.profile_picture}`} 
+                                    alt="Profile" 
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <>{patient.first_name.charAt(0)}{patient.last_name.charAt(0)}</>
+                            )}
                         </div>
                         <div>
                             <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
@@ -176,7 +189,7 @@ export default function PatientDetail() {
                             </div>
                         </div>
                     </div>
-                    <Link to={`/patients/register`} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-white px-4 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-brand-600/20 text-sm">
+                    <Link to={`/patients/edit/${patient.id}`} className="flex items-center gap-2 bg-brand-600 hover:bg-brand-500 text-white px-4 py-2.5 rounded-xl font-semibold transition-all shadow-lg shadow-brand-600/20 text-sm">
                         <Edit className="w-4 h-4" />
                         Edit Record
                     </Link>
@@ -423,6 +436,10 @@ export default function PatientDetail() {
                             </div>
                         )}
                     </div>
+                )}
+
+                {activeTab === 'wallet' && id && (
+                    <PatientWallet patientId={id} />
                 )}
             </div>
         </div>

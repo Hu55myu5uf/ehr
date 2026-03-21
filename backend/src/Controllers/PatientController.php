@@ -51,7 +51,15 @@ class PatientController
             // Check permissions
             AuthMiddleware::requireRole($user, \App\Config\Roles::CAN_EDIT_PATIENTS);
 
-            $data = json_decode(file_get_contents('php://input'), true);
+            $contentType = $_SERVER["CONTENT_TYPE"] ?? '';
+            if (strpos($contentType, 'multipart/form-data') !== false) {
+                $data = $_POST;
+                if (isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error'] === UPLOAD_ERR_OK) {
+                    $data['profile_picture'] = $this->handleImageUpload($_FILES['profile_picture']);
+                }
+            } else {
+                $data = json_decode(file_get_contents('php://input'), true);
+            }
 
             // Validate input using Respect\Validation
             $validator = v::key('first_name', v::stringType()->notEmpty())
@@ -146,7 +154,15 @@ class PatientController
             // Check permissions
             AuthMiddleware::requireRole($user, \App\Config\Roles::CAN_EDIT_PATIENTS);
 
-            $data = json_decode(file_get_contents('php://input'), true);
+            $contentType = $_SERVER["CONTENT_TYPE"] ?? '';
+            if (strpos($contentType, 'multipart/form-data') !== false) {
+                $data = $_POST;
+                if (isset($_FILES['profile_picture']) && $_FILES['profile_picture']['error'] === UPLOAD_ERR_OK) {
+                    $data['profile_picture'] = $this->handleImageUpload($_FILES['profile_picture']);
+                }
+            } else {
+                $data = json_decode(file_get_contents('php://input'), true);
+            }
 
             $patient = $this->patientService->updatePatient($id, $data);
 
@@ -154,6 +170,42 @@ class PatientController
             $this->audit->logRequest($user, $id);
 
             $this->success($patient);
+
+        } catch (\Exception $e) {
+            $this->error($e->getMessage());
+        }
+    }
+
+    /**
+     * Create a minimal walk-in patient record
+     * POST /api/patients/walk-in
+     */
+    public function createWalkIn(object $user): void
+    {
+        try {
+            AuthMiddleware::requireRole($user, \App\Config\Roles::CAN_EDIT_PATIENTS);
+
+            $data = json_decode(file_get_contents('php://input'), true);
+
+            // Minimal validation
+            $validator = v::key('first_name', v::stringType()->notEmpty())
+                ->key('last_name', v::stringType()->notEmpty())
+                ->key('date_of_birth', v::date('Y-m-d'))
+                ->key('gender', v::in(['male', 'female', 'other']));
+
+            try {
+                $validator->assert($data);
+            } catch (\Respect\Validation\Exceptions\NestedValidationException $e) {
+                $this->badRequest($e->getFullMessage());
+                return;
+            }
+
+            $patient = $this->patientService->registerWalkIn($data);
+
+            // Log audit trail
+            $this->audit->logRequest($user, $patient['id']);
+
+            $this->success($patient, 201);
 
         } catch (\Exception $e) {
             $this->error($e->getMessage());
@@ -202,5 +254,23 @@ class PatientController
     private function badRequest(string $message): void
     {
         $this->error($message, 400);
+    }
+
+    private function handleImageUpload(array $file): string
+    {
+        $uploadDir = __DIR__ . '/../../public/uploads/patients/';
+        if (!is_dir($uploadDir)) {
+            mkdir($uploadDir, 0777, true);
+        }
+
+        $extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+        $fileName = \Ramsey\Uuid\Uuid::uuid4()->toString() . '.' . $extension;
+        $targetPath = $uploadDir . $fileName;
+
+        if (!move_uploaded_file($file['tmp_name'], $targetPath)) {
+            throw new \RuntimeException('Failed to save profile picture');
+        }
+
+        return 'uploads/patients/' . $fileName;
     }
 }

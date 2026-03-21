@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { useParams, useLocation } from 'react-router-dom';
 import {
-    Stethoscope, Clock, Loader2, User, ChevronRight, LayoutPanelLeft, Filter, Activity
+    Stethoscope, Clock, Loader2, User, ChevronRight, LayoutPanelLeft, Filter, Activity,
+    ExternalLink
 } from 'lucide-react';
 import api from '../api/client';
 import ConsultationForm from './ConsultationForm';
@@ -26,7 +28,28 @@ export default function Consultations() {
     const [showAll, setShowAll] = useState(false);
     const [selectedRx, setSelectedRx] = useState<Consultation | null>(null);
 
-    useEffect(() => { fetchConsultations(); }, [filter, showAll]);
+    const location = useLocation();
+    const searchParams = new URLSearchParams(location.search);
+    const targetId = searchParams.get('id');
+
+    useEffect(() => {
+        if (targetId) {
+            setShowAll(true);
+        }
+    }, [targetId]);
+
+    useEffect(() => { 
+        fetchConsultations(); 
+    }, [filter, showAll]);
+
+    useEffect(() => {
+        if (targetId && consultations.length > 0) {
+            const found = consultations.find(c => c.id === targetId);
+            if (found) {
+                setSelectedRx(found);
+            }
+        }
+    }, [targetId, consultations]);
 
     const fetchConsultations = async () => {
         try {
@@ -49,6 +72,8 @@ export default function Consultations() {
             setLoading(false);
         }
     };
+
+
 
     const statusColors: Record<string, string> = {
         scheduled: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',

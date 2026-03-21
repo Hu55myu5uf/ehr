@@ -59,4 +59,69 @@ class AuditService
             return false;
         }
     }
+
+    /**
+     * Get audit logs with pagination and filters
+     */
+    public function getLogs(int $page = 1, int $limit = 50, array $filters = []): array
+    {
+        $offset = ($page - 1) * $limit;
+        $where = ["1=1"];
+        $params = [];
+
+        if (!empty($filters['user_id'])) {
+            $where[] = "l.user_id = :user_id";
+            $params['user_id'] = $filters['user_id'];
+        }
+
+        if (!empty($filters['patient_id'])) {
+            $where[] = "l.patient_id = :patient_id";
+            $params['patient_id'] = $filters['patient_id'];
+        }
+
+        if (!empty($filters['action'])) {
+            $where[] = "l.action = :action";
+            $params['action'] = strtoupper($filters['action']);
+        }
+
+        if (!empty($filters['entity_type'])) {
+            $where[] = "l.entity_type = :entity_type";
+            $params['entity_type'] = strtolower($filters['entity_type']);
+        }
+
+        $whereClause = implode(" AND ", $where);
+
+        // Get count
+        $countStmt = $this->db->prepare("SELECT COUNT(*) FROM audit_logs l WHERE $whereClause");
+        $countStmt->execute($params);
+        $total = (int)$countStmt->fetchColumn();
+
+        // Get records
+        $stmt = $this->db->prepare("
+            SELECT l.*, 
+                   u.username as operator_username, u.full_name as operator_name, u.role as operator_role,
+                   p.first_name as patient_first, p.last_name as patient_last
+            FROM audit_logs l
+            LEFT JOIN users u ON l.user_id = u.id
+            LEFT JOIN patients p ON l.patient_id = p.id
+            WHERE $whereClause
+            ORDER BY l.created_at DESC
+            LIMIT :limit OFFSET :offset
+        ");
+
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
+        foreach ($params as $key => $val) {
+            $stmt->bindValue(":$key", $val);
+        }
+        $stmt->execute();
+        $logs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return [
+            'logs' => $logs,
+            'total' => $total,
+            'page' => $page,
+            'last_page' => ceil($total / $limit)
+        ];
+    }
 }

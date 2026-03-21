@@ -205,6 +205,16 @@ export default function Encounters() {
                                             type="text"
                                             value={patientSearch}
                                             onChange={(e) => setPatientSearch(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    const filtered = patients.filter(p => {
+                                                        const q = patientSearch.toLowerCase();
+                                                        return p.first_name.toLowerCase().includes(q) || p.last_name.toLowerCase().includes(q) || p.mrn.toLowerCase().includes(q);
+                                                    });
+                                                    if (filtered.length > 0) selectPatient(filtered[0]);
+                                                }
+                                            }}
                                             placeholder="Filter patients by name..."
                                             className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-10 pr-4 py-2.5 outline-none focus:border-brand-500 transition-all text-slate-900 dark:text-white text-sm"
                                         />

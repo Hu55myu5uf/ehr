@@ -195,4 +195,52 @@ class ReportService
             'timestamp' => date('Y-m-d H:i:s')
         ];
     }
+
+    /**
+     * Get visit trend for the last 30 days
+     */
+    public function getDailyVisitTrend(?string $startDate = null, ?string $endDate = null): array
+    {
+        $conn = $this->db->getConnection();
+        
+        $where = "1=1";
+        $params = [];
+        if ($startDate) {
+            $where .= " AND created_at >= :start";
+            $params['start'] = $startDate . " 00:00:00";
+        } else {
+            $where .= " AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+        }
+        if ($endDate) {
+            $where .= " AND created_at <= :end";
+            $params['end'] = $endDate . " 23:59:59";
+        }
+
+        $sql = "
+            SELECT 
+                DATE(created_at) as date,
+                COUNT(*) as count
+            FROM encounters
+            WHERE $where
+            GROUP BY DATE(created_at)
+            ORDER BY date ASC
+        ";
+        
+        $stmt = $conn->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Get a consolidated performance overview for dashboards
+     */
+    public function getPerformanceOverview(): array
+    {
+        return [
+            'financial' => $this->getFinancialOverview(),
+            'revenue_trend' => $this->getDailyRevenueTrend(),
+            'visit_trend' => $this->getDailyVisitTrend(),
+            'hospital_stats' => $this->aggregateHospitalStats()
+        ];
+    }
 }

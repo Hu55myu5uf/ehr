@@ -19,10 +19,12 @@ import {
     Activity,
     Banknote,
     BarChart3,
+    Database,
     Shield,
     LucideIcon,
     ChevronLeft,
     ChevronRight,
+    BookOpen,
     X
 } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
@@ -33,6 +35,7 @@ interface NavItem {
     icon: LucideIcon;
     label: string;
     roles: string[]; // which roles can see this item
+    isExternal?: boolean;
 }
 
 const ALL_ROLES = ['super_admin', 'doctor', 'nurse', 'lab_attendant', 'receptionist', 'pharmacist', 'billing_officer'];
@@ -81,9 +84,12 @@ export default function Sidebar({ user: propUser, isMobile, onMobileClose }: Sid
         { to: '/wards', icon: BedDouble, label: 'Wards', roles: ['super_admin', 'nurse', 'doctor'] },
         { to: '/insurance', icon: Shield, label: 'Insurance', roles: ['super_admin', 'billing_officer'] },
         { to: '/admin/prices', icon: Banknote, label: 'Price List', roles: ['super_admin'] },
-        { to: '/admin/funds', icon: BarChart3, label: 'Funds Statistics', roles: ['super_admin'] },
         { to: '/admin/users', icon: ShieldCheck, label: 'User Management', roles: ['super_admin'] },
-        { to: '/settings', icon: Settings, label: 'Settings', roles: ALL_ROLES },
+        { to: '/admin/logs', icon: Database, label: 'System Records', roles: ['super_admin'] },
+        { to: 'https://www.medscape.com/', icon: HeartPulse, label: 'Medscape', roles: ['super_admin', 'doctor'], isExternal: true },
+        { to: '/resources/calc', icon: Activity, label: 'Medical Calc', roles: ['super_admin', 'doctor'] },
+        { to: '/resources/emdex', icon: BookOpen, label: 'EMDEX', roles: ['super_admin', 'pharmacist'] },
+        { to: '/settings', icon: Settings, label: 'Profile Settings', roles: ALL_ROLES },
     ];
 
     const visibleItems = navItems.filter(item => user.role && item.roles.includes(user.role));
@@ -128,21 +134,35 @@ export default function Sidebar({ user: propUser, isMobile, onMobileClose }: Sid
 
             <nav className={`flex-1 space-y-2 overflow-y-auto overflow-x-hidden ${isCollapsed ? 'scrollbar-hidden' : 'scrollbar-slim'}`}>
                 {visibleItems.map((item) => (
-                    <NavLink
-                        key={item.to}
-                        to={item.to}
-                        onClick={handleNavClick}
-                        className={({ isActive }) =>
-                            `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group ${isActive
-                                ? 'bg-brand-600/10 text-brand-600 dark:text-brand-500 font-semibold shadow-sm'
-                                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
-                            } ${isCollapsed && !isMobile ? 'justify-center' : ''}`
-                        }
-                        title={isCollapsed && !isMobile ? item.label : undefined}
-                    >
-                        <item.icon className="w-5 h-5 shrink-0" />
-                        {(!isCollapsed || isMobile) && <span className="transition-opacity duration-300 whitespace-nowrap">{item.label}</span>}
-                    </NavLink>
+                    item.isExternal ? (
+                        <a
+                            key={item.to}
+                            href={item.to}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white ${isCollapsed && !isMobile ? 'justify-center' : ''}`}
+                            title={isCollapsed && !isMobile ? item.label : undefined}
+                        >
+                            <item.icon className="w-5 h-5 shrink-0" />
+                            {(!isCollapsed || isMobile) && <span className="transition-opacity duration-300 whitespace-nowrap">{item.label}</span>}
+                        </a>
+                    ) : (
+                        <NavLink
+                            key={item.to}
+                            to={item.to}
+                            onClick={handleNavClick}
+                            className={({ isActive }) =>
+                                `flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group ${isActive
+                                    ? 'bg-brand-600/10 text-brand-600 dark:text-brand-500 font-semibold shadow-sm'
+                                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
+                                } ${isCollapsed && !isMobile ? 'justify-center' : ''}`
+                            }
+                            title={isCollapsed && !isMobile ? item.label : undefined}
+                        >
+                            <item.icon className="w-5 h-5 shrink-0" />
+                            {(!isCollapsed || isMobile) && <span className="transition-opacity duration-300 whitespace-nowrap">{item.label}</span>}
+                        </NavLink>
+                    )
                 ))}
             </nav>
 
@@ -169,8 +189,8 @@ export default function Sidebar({ user: propUser, isMobile, onMobileClose }: Sid
                     {!isCollapsed && (
                         <div className="px-3 mb-4 transition-opacity duration-300 flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-brand-500/10 flex items-center justify-center text-brand-500 font-bold text-lg overflow-hidden shrink-0 border border-slate-200 dark:border-slate-800">
-                                {(user as any).profile_picture ? (
-                                    <img src={`http://localhost:5173/api/uploads/profiles/${(user as any).profile_picture}`} alt="" className="w-full h-full object-cover" />
+                                {user.profile_picture ? (
+                                    <img src={`/uploads/profiles/${user.profile_picture}`} alt="" className="w-full h-full object-cover" />
                                 ) : (
                                     ((user as any).full_name || user.username).charAt(0).toUpperCase()
                                 )}
