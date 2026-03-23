@@ -61,6 +61,10 @@ class PriceListService
 
         $prices = [
             ['type' => 'consultation', 'name' => 'Consultation Fee', 'price' => 5000.00, 'cat' => 'Service'],
+            ['type' => 'consultation_emergency', 'name' => 'Emergency Consultation Fee', 'price' => 15000.00, 'cat' => 'Service'],
+            ['type' => 'consultation_followup', 'name' => 'Follow-up Consultation Fee', 'price' => 3000.00, 'cat' => 'Service'],
+            ['type' => 'consultation_walkin', 'name' => 'Walk-in Consultation Fee', 'price' => 5000.00, 'cat' => 'Service'],
+            ['type' => 'consultation_specialist', 'name' => 'Specialist Consultation Fee', 'price' => 10000.00, 'cat' => 'Service'],
             // HAEMATOLOGY
             ['type' => 'lab_test', 'name' => 'Fullblood count', 'price' => 2500.00, 'cat' => 'Haematology'],
             ['type' => 'lab_test', 'name' => 'Rbs', 'price' => 1000.00, 'cat' => 'Haematology'],

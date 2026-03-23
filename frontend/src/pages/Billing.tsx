@@ -20,6 +20,7 @@ interface Bill {
     payment_method: string;
     generated_at: string;
     paid_at: string;
+    is_walk_in?: boolean | number;
     items?: BillItem[];
 }
 
@@ -545,7 +546,7 @@ export default function Billing() {
                                         <option value="card">Card</option>
                                         <option value="transfer">Bank Transfer</option>
                                         <option value="mobile">Mobile Payment</option>
-                                        <option value="wallet">Patient Wallet</option>
+                                        {!selectedBill.is_walk_in && <option value="wallet">Patient Wallet</option>}
                                     </select>
                                 </div>
                                 <div>

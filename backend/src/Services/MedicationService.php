@@ -44,13 +44,13 @@ class MedicationService
             $stmt = $this->db->prepare("
                 INSERT INTO medications (
                     id, patient_id, encounter_id, provider_id, prescribed_by,
-                    medication_name, inventory_item_id, batch_id, rxnorm_code, dosage, frequency, route,
+                    medication_name, inventory_item_id, batch_id, rxnorm_code, dosage, quantity, frequency, route,
                     instructions, start_date, end_date, refills_authorized, refills_remaining,
                     prescription_status, billing_status, reason, is_active
                 )
                 VALUES (
                     :id, :patient_id, :encounter_id, :provider_id, :prescribed_by,
-                    :medication_name, :inventory_item_id, :batch_id, :rxnorm_code, :dosage, :frequency, :route,
+                    :medication_name, :inventory_item_id, :batch_id, :rxnorm_code, :dosage, :quantity, :frequency, :route,
                     :instructions, :start_date, :end_date, :refills_authorized, :refills_remaining,
                     'pending', 'pending_invoice', :reason, TRUE
                 )
@@ -69,6 +69,7 @@ class MedicationService
                 'batch_id' => $batchId,
                 'rxnorm_code' => $data['rxnorm_code'] ?? null,
                 'dosage' => $data['dosage'],
+                'quantity' => $data['quantity'] ?? 1,
                 'frequency' => $data['frequency'],
                 'route' => $data['route'],
                 'instructions' => $data['instructions'] ?? null,
@@ -184,7 +185,7 @@ class MedicationService
     }
 
     /**
-     * Get pending prescriptions (for pharmacist)
+     * Get pending prescriptions (ready for dispensing)
      */
     public function getPendingPrescriptions(): array
     {
@@ -197,7 +198,7 @@ class MedicationService
                 JOIN patients p ON m.patient_id = p.id
                 LEFT JOIN providers pr ON m.prescribed_by = pr.id
                 WHERE m.prescription_status = 'pending'
-                  AND m.billing_status IN ('pending_invoice', 'invoiced', 'approved', 'paid')
+                  AND m.billing_status IN ('paid', 'approved')
                   AND m.is_active = TRUE
                   AND m.deleted_at IS NULL
                 ORDER BY m.created_at ASC
@@ -207,6 +208,33 @@ class MedicationService
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (PDOException $e) {
             throw new \RuntimeException("Failed to fetch pending prescriptions: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get prescriptions awaiting payment (invoiced but not paid)
+     */
+    public function getAwaitingPaymentPrescriptions(): array
+    {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT m.*, 
+                       p.first_name as patient_first, p.last_name as patient_last, p.mrn,
+                       pr.first_name as provider_first, pr.last_name as provider_last
+                FROM medications m
+                JOIN patients p ON m.patient_id = p.id
+                LEFT JOIN providers pr ON m.prescribed_by = pr.id
+                WHERE m.prescription_status = 'pending'
+                  AND m.billing_status = 'invoiced'
+                  AND m.is_active = TRUE
+                  AND m.deleted_at IS NULL
+                ORDER BY m.created_at ASC
+            ");
+
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            throw new \RuntimeException("Failed to fetch awaiting payment prescriptions: " . $e->getMessage());
         }
     }
 
@@ -269,7 +297,36 @@ class MedicationService
                 'user_id' => $userId
             ]);
 
-            // Audit log
+            // Deduct from inventory if linked
+            if (!empty($medication['inventory_item_id'])) {
+                $item_id = $medication['inventory_item_id'];
+                $qty_to_deduct = (int)($medication['quantity'] ?? 1);
+
+                // Update inventory quantity
+                $invStmt = $this->db->prepare("
+                    UPDATE inventory 
+                    SET quantity = quantity - :deduct, 
+                        updated_at = NOW() 
+                    WHERE id = :item_id AND deleted_at IS NULL
+                ");
+                $invStmt->execute([
+                    'deduct' => $qty_to_deduct,
+                    'item_id' => $item_id
+                ]);
+
+                // Log inventory change
+                $this->auditService->log(
+                    $userId,
+                    $medication['patient_id'],
+                    'UPDATE',
+                    'inventory',
+                    $item_id,
+                    ['action' => 'DISPENSE_DEDUCTION', 'deducted' => $qty_to_deduct],
+                    200
+                );
+            }
+
+            // Audit log for dispensing
             $this->auditService->log(
                 $userId,
                 $medication['patient_id'],

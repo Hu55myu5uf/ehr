@@ -180,11 +180,11 @@ class LabService
                 JOIN patients p ON lo.patient_id = p.id
                 LEFT JOIN providers pr ON lo.provider_id = pr.id
                 WHERE lo.status IN ('ordered', 'collected', 'in_progress')
-                  AND lo.billing_status IN ('pending_invoice', 'invoiced', 'approved', 'paid')
+                  AND lo.billing_status IN ('paid', 'approved')
                   AND lo.deleted_at IS NULL
                 ORDER BY 
                     FIELD(lo.priority, 'stat', 'urgent', 'routine'),
-                    lo.ordered_at ASC
+                    lo.ordered_at DESC
             ");
 
             $stmt->execute();
@@ -192,6 +192,30 @@ class LabService
             return $results;
         } catch (PDOException $e) {
             throw new \RuntimeException("Failed to fetch pending orders: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get lab orders that have been invoiced but not yet paid
+     */
+    public function getAwaitingPaymentLabOrders(): array
+    {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT lo.*, 
+                       p.first_name as patient_first, p.last_name as patient_last, p.mrn,
+                       pr.first_name as provider_first, pr.last_name as provider_last
+                FROM lab_orders lo
+                JOIN patients p ON lo.patient_id = p.id
+                LEFT JOIN providers pr ON lo.provider_id = pr.id
+                WHERE lo.billing_status = 'invoiced'
+                  AND lo.deleted_at IS NULL
+                ORDER BY lo.ordered_at DESC
+            ");
+            $stmt->execute();
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            throw new \RuntimeException("Failed to fetch awaiting payment orders: " . $e->getMessage());
         }
     }
 
@@ -474,7 +498,7 @@ class LabService
                 LEFT JOIN providers pr ON lo.provider_id = pr.id
                 WHERE lo.billing_status = 'pending_invoice'
                   AND lo.deleted_at IS NULL
-                ORDER BY lo.ordered_at ASC
+                ORDER BY lo.ordered_at DESC
             ");
 
             $stmt->execute();

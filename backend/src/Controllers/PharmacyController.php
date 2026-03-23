@@ -348,5 +348,27 @@ class PharmacyController
             echo json_encode(['error' => $e->getMessage()]);
         }
     }
+
+    /**
+     * Get all prescriptions awaiting payment
+     * GET /api/pharmacy/orders/awaiting-payment
+     */
+    public function listAwaitingPayment(object $user): void
+    {
+        if ($user->role !== Roles::PHARMACIST && $user->role !== Roles::SUPER_ADMIN) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden']);
+            return;
+        }
+
+        try {
+            $prescriptions = $this->medicationService->getAwaitingPaymentPrescriptions();
+            http_response_code(200);
+            echo json_encode(['prescriptions' => $prescriptions]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+    }
 }
 

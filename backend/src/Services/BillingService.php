@@ -23,13 +23,6 @@ class BillingService
     {
         $conn = $this->db->getConnection();
 
-        // Check if bill already exists
-        $check = $conn->prepare("SELECT id FROM bills WHERE encounter_id = :eid");
-        $check->execute(['eid' => $encounterId]);
-        if ($check->fetch()) {
-            throw new \RuntimeException('Bill already exists for this encounter');
-        }
-
         // Get encounter details and insurance info
         $enc = $conn->prepare("
             SELECT e.*, p.first_name, p.last_name, p.mrn, p.insurance_provider_id, p.insurance_policy_number
@@ -42,6 +35,15 @@ class BillingService
 
         $conn->beginTransaction();
         try {
+            // Check if consultation fee was already billed for this encounter (e.g. at Walk-in)
+            $stmtCheck = $conn->prepare("
+                SELECT COUNT(*) FROM bill_items bi
+                JOIN bills b ON bi.bill_id = b.id
+                WHERE b.encounter_id = :eid AND bi.item_type = 'consultation'
+            ");
+            $stmtCheck->execute(['eid' => $encounterId]);
+            $consultationAlreadyBilled = $stmtCheck->fetchColumn() > 0;
+
             $billId = Uuid::uuid4()->toString();
             $billNumber = 'BILL' . str_pad(mt_rand(1, 99999999), 8, '0', STR_PAD_LEFT);
 
@@ -60,35 +62,63 @@ class BillingService
 
             $total = 0.00;
 
-            // Add consultation fee
-            $consultFee = $this->priceService->getPriceByType('consultation');
-            $total += $this->addBillItem($conn, $billId, 'consultation', 'Consultation Fee', $encounterId, 1, $consultFee);
+            // Add consultation fee ONLY if not already billed
+            if (!$consultationAlreadyBilled) {
+                $consultFee = $this->getConsultationFeeByEncounterType($encounter['encounter_type'] ?? 'office_visit');
+                $consultLabel = $this->getConsultationFeeLabel($encounter['encounter_type'] ?? 'office_visit');
+                $total += $this->addBillItem($conn, $billId, 'consultation', $consultLabel, $encounterId, 1, $consultFee);
+            }
 
-            // Add lab test charges
-            $labs = $conn->prepare("SELECT id, test_name FROM lab_orders WHERE encounter_id = :eid AND deleted_at IS NULL");
+            // Add lab test charges - ONLY those pending invoice (not already paid or invoiced)
+            $labs = $conn->prepare("
+                SELECT id, test_name 
+                FROM lab_orders 
+                WHERE encounter_id = :eid 
+                  AND billing_status = 'pending_invoice'
+                  AND deleted_at IS NULL
+            ");
             $labs->execute(['eid' => $encounterId]);
             $defaultLabFee = $this->priceService->getPriceByType('lab_test');
+            $labIds = [];
             foreach ($labs->fetchAll(\PDO::FETCH_ASSOC) as $lab) {
                 $specificPrice = $this->priceService->getPriceByItemName($lab['test_name'], $defaultLabFee);
                 $total += $this->addBillItem($conn, $billId, 'lab_test', $lab['test_name'], $lab['id'], 1, $specificPrice);
+                $labIds[] = $lab['id'];
             }
 
-            // Add medication charges (using specific prices if available)
+            // Mark lab orders as invoiced
+            if (!empty($labIds)) {
+                $placeholders = implode(',', array_fill(0, count($labIds), '?'));
+                $conn->prepare("UPDATE lab_orders SET billing_status = 'invoiced' WHERE id IN ($placeholders)")
+                     ->execute($labIds);
+            }
+
+            // Add medication charges - ONLY those pending invoice
             $meds = $conn->prepare("
-                SELECT m.id, m.medication_name, m.dosage, i.unit_price 
+                SELECT m.id, m.medication_name, m.dosage, m.quantity, i.unit_price 
                 FROM medications m 
                 LEFT JOIN inventory i ON m.inventory_item_id = i.id
-                WHERE m.encounter_id = :eid AND m.deleted_at IS NULL
+                WHERE m.encounter_id = :eid 
+                  AND m.billing_status = 'pending_invoice'
+                  AND m.deleted_at IS NULL
             ");
             $meds->execute(['eid' => $encounterId]);
             $medFeeDefault = $this->priceService->getPriceByType('medication');
-            
+            $medIds = [];
             foreach ($meds->fetchAll(\PDO::FETCH_ASSOC) as $med) {
                 $price = $med['unit_price'] ?? $medFeeDefault;
-                $total += $this->addBillItem($conn, $billId, 'medication', "{$med['medication_name']} ({$med['dosage']})", $med['id'], 1, (float)$price);
+                $qty = (int)($med['quantity'] ?? 1);
+                $total += $this->addBillItem($conn, $billId, 'medication', "{$med['medication_name']} ({$med['dosage']})", $med['id'], $qty, (float)$price);
+                $medIds[] = $med['id'];
             }
 
-            // Update total
+            // Mark medications as invoiced
+            if (!empty($medIds)) {
+                $placeholders = implode(',', array_fill(0, count($medIds), '?'));
+                $conn->prepare("UPDATE medications SET billing_status = 'invoiced' WHERE id IN ($placeholders)")
+                     ->execute($medIds);
+            }
+
             // Update total and calculate portions
             $insurancePortion = 0.00;
             $patientPortion = $total;
@@ -227,7 +257,7 @@ class BillingService
     {
         $conn = $this->db->getConnection();
         $stmt = $conn->prepare("
-            SELECT b.*, p.first_name AS patient_first, p.last_name AS patient_last, p.mrn
+            SELECT b.*, p.first_name AS patient_first, p.last_name AS patient_last, p.mrn, p.is_walk_in
             FROM bills b
             JOIN patients p ON b.patient_id = p.id
             WHERE b.id = :id
@@ -259,7 +289,7 @@ class BillingService
         }
 
         $stmt = $conn->prepare("
-            SELECT b.*, p.first_name AS patient_first, p.last_name AS patient_last, p.mrn
+            SELECT b.*, p.first_name AS patient_first, p.last_name AS patient_last, p.mrn, p.is_walk_in
             FROM bills b
             JOIN patients p ON b.patient_id = p.id
             WHERE {$where}
@@ -336,6 +366,11 @@ class BillingService
             } elseif ($item['item_type'] === 'lab_test') {
                 $conn->prepare("UPDATE lab_orders SET billing_status = 'paid', updated_at = NOW() WHERE id = :id")
                      ->execute(['id' => $item['reference_id']]);
+            } elseif ($item['item_type'] === 'consultation') {
+                // If this consultation belongs to an appointment, move it from 'pending_payment' to 'checked_in'
+                $conn->prepare("UPDATE appointments SET status = 'checked_in', updated_at = NOW() 
+                                WHERE encounter_id = :eid AND status = 'pending_payment'")
+                     ->execute(['eid' => $item['reference_id']]);
             }
         }
     }
@@ -498,7 +533,7 @@ class BillingService
             $insurancePortion = 0.00;
             $patientPortion = $total;
 
-            if ($patientInfo['insurance_provider_id']) {
+            if ($patientInfo && $patientInfo['insurance_provider_id']) {
                 $insurancePortion = $total;
                 $patientPortion = 0.00;
             }
@@ -525,5 +560,131 @@ class BillingService
             throw $e;
         }
     }
-}
 
+    /**
+     * Generate a complete walk-in bill (consultation + optional labs + optional medications)
+     */
+    public function generateWalkInBill(string $patientId, string $createdBy, array $options = []): array
+    {
+        $conn = $this->db->getConnection();
+        $conn->beginTransaction();
+
+        try {
+            $billId = Uuid::uuid4()->toString();
+            $billNumber = 'WK-' . str_pad(mt_rand(1, 99999999), 8, '0', STR_PAD_LEFT);
+            $serviceType = $options['service_type'] ?? 'consultation';
+            $encounterId = $options['encounter_id'] ?? null;
+
+            // Create bill
+            $stmt = $conn->prepare("
+                INSERT INTO bills (id, patient_id, encounter_id, bill_number, status, created_by)
+                VALUES (:id, :pid, :eid, :bn, 'pending', :cb)
+            ");
+            $stmt->execute([
+                'id' => $billId,
+                'pid' => $patientId,
+                'eid' => $encounterId,
+                'bn' => $billNumber,
+                'cb' => $createdBy,
+            ]);
+
+            $total = 0.00;
+
+            // Add consultation fee if service includes consultation
+            $includesConsultation = in_array($serviceType, [
+                'consultation', 'consultation_and_lab', 'consultation_and_pharmacy', 'full_service'
+            ]);
+
+            if ($includesConsultation) {
+                $consultFee = $this->getConsultationFeeByEncounterType('walk_in');
+                $total += $this->addBillItem($conn, $billId, 'consultation', 'Walk-in Consultation Fee', $encounterId, 1, $consultFee);
+            }
+
+            // Add lab test charges if lab orders specified
+            if (!empty($options['lab_order_ids'])) {
+                $defaultLabFee = $this->priceService->getPriceByType('lab_test');
+                $placeholders = implode(',', array_fill(0, count($options['lab_order_ids']), '?'));
+                $labStmt = $conn->prepare("SELECT id, test_name FROM lab_orders WHERE id IN ($placeholders)");
+                $labStmt->execute($options['lab_order_ids']);
+                foreach ($labStmt->fetchAll(\PDO::FETCH_ASSOC) as $lab) {
+                    $specificPrice = $this->priceService->getPriceByItemName($lab['test_name'], $defaultLabFee);
+                    $total += $this->addBillItem($conn, $billId, 'lab_test', $lab['test_name'], $lab['id'], 1, $specificPrice);
+                }
+            }
+
+            // Add medication charges if medication IDs specified
+            if (!empty($options['medication_ids'])) {
+                $medFeeDefault = $this->priceService->getPriceByType('medication');
+                $placeholders = implode(',', array_fill(0, count($options['medication_ids']), '?'));
+                $medStmt = $conn->prepare("
+                    SELECT m.id, m.medication_name, m.dosage, i.unit_price 
+                    FROM medications m 
+                    LEFT JOIN inventory i ON m.inventory_item_id = i.id
+                    WHERE m.id IN ($placeholders)
+                ");
+                $medStmt->execute($options['medication_ids']);
+                foreach ($medStmt->fetchAll(\PDO::FETCH_ASSOC) as $med) {
+                    $price = $med['unit_price'] ?? $medFeeDefault;
+                    $total += $this->addBillItem($conn, $billId, 'medication', "{$med['medication_name']} ({$med['dosage']})", $med['id'], 1, (float)$price);
+                }
+            }
+
+            // Update total (walk-ins always pay full — no insurance by default)
+            $conn->prepare("UPDATE bills SET total_amount = :total, insurance_portion = 0, patient_portion = :pp WHERE id = :id")
+                 ->execute([
+                     'total' => $total,
+                     'pp' => $total,
+                     'id' => $billId
+                 ]);
+
+            $conn->commit();
+            return $this->getBillById($billId);
+
+        } catch (\Exception $e) {
+            $conn->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Get consultation fee based on encounter type
+     */
+    private function getConsultationFeeByEncounterType(string $encounterType): float
+    {
+        $feeTypeMap = [
+            'office_visit'  => 'consultation',
+            'emergency'     => 'consultation_emergency',
+            'follow_up'     => 'consultation_followup',
+            'walk_in'       => 'consultation_walkin',
+            'telehealth'    => 'consultation',
+            'inpatient'     => 'consultation',
+        ];
+
+        $feeType = $feeTypeMap[$encounterType] ?? 'consultation';
+        $fee = $this->priceService->getPriceByType($feeType);
+
+        // Fallback to generic consultation fee if specific type not found
+        if ($fee <= 0) {
+            $fee = $this->priceService->getPriceByType('consultation');
+        }
+
+        return $fee;
+    }
+
+    /**
+     * Get consultation fee label based on encounter type
+     */
+    private function getConsultationFeeLabel(string $encounterType): string
+    {
+        $labels = [
+            'office_visit'  => 'Consultation Fee',
+            'emergency'     => 'Emergency Consultation Fee',
+            'follow_up'     => 'Follow-up Consultation Fee',
+            'walk_in'       => 'Walk-in Consultation Fee',
+            'telehealth'    => 'Telehealth Consultation Fee',
+            'inpatient'     => 'Inpatient Consultation Fee',
+        ];
+
+        return $labels[$encounterType] ?? 'Consultation Fee';
+    }
+}

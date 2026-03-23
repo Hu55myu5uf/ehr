@@ -24,11 +24,14 @@ class AppointmentService
         $conn = $this->db->getConnection();
         $id = Uuid::uuid4()->toString();
 
+        $status = $data['status'] ?? 'scheduled';
+        $encounterId = $data['encounter_id'] ?? null;
+
         $stmt = $conn->prepare("
             INSERT INTO appointments (id, patient_id, provider_id, appointment_date, appointment_time, 
-                appointment_type, status, reason, notes, created_by)
+                appointment_type, status, reason, notes, encounter_id, created_by)
             VALUES (:id, :patient_id, :provider_id, :appointment_date, :appointment_time,
-                :appointment_type, 'scheduled', :reason, :notes, :created_by)
+                :appointment_type, :status, :reason, :notes, :encounter_id, :created_by)
         ");
 
         $stmt->execute([
@@ -38,8 +41,10 @@ class AppointmentService
             'appointment_date' => $data['appointment_date'],
             'appointment_time' => $data['appointment_time'] ?? null,
             'appointment_type' => $data['appointment_type'] ?? 'new_visit',
+            'status' => $status,
             'reason' => $data['reason'] ?? null,
             'notes' => $data['notes'] ?? null,
+            'encounter_id' => $encounterId,
             'created_by' => $createdBy
         ]);
 

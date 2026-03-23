@@ -192,7 +192,7 @@ export default function Sidebar({ user: propUser, isMobile, onMobileClose }: Sid
                                 {user.profile_picture ? (
                                     <img src={`/uploads/profiles/${user.profile_picture}`} alt="" className="w-full h-full object-cover" />
                                 ) : (
-                                    ((user as any).full_name || user.username).charAt(0).toUpperCase()
+                                    (((user as any).full_name || user.username) || 'U').charAt(0).toUpperCase()
                                 )}
                             </div>
                             <div className="min-w-0">

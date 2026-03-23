@@ -36,6 +36,7 @@ use App\Controllers\SettingsController;
 use App\Controllers\AIController;
 use App\Controllers\WalletController;
 use App\Controllers\AuditController;
+use App\Controllers\WalkInController;
 
 // Load environment variables
 $dotenv = Dotenv::createImmutable(__DIR__ . '/..');
@@ -326,6 +327,10 @@ try {
         $controller = new LabController();
         $controller->getPendingOrders($user);
     }
+    elseif ($uri === '/api/labs/orders/awaiting-payment' && $method === 'GET') {
+        $controller = new LabController();
+        $controller->listAwaitingPayment($user);
+    }
     elseif (preg_match('#^/api/labs/orders/patient/([^/]+)$#', $uri, $matches) && $method === 'GET') {
         $controller = new LabController();
         $controller->getPatientOrders($user, $matches[1]);
@@ -379,6 +384,10 @@ try {
     elseif (preg_match('#^/api/medications/patient/([^/]+)/pending$#', $uri, $matches) && $method === 'GET') {
         $controller = new PharmacyController();
         $controller->getPatientPrescriptions($user, $matches[1]);
+    }
+    elseif ($uri === '/api/pharmacy/orders/awaiting-payment' && $method === 'GET') {
+        $controller = new PharmacyController();
+        $controller->listAwaitingPayment($user);
     }
     elseif ($uri === '/api/pharmacy/invoicing/pending' && $method === 'GET') {
         $controller = new PharmacyController();
@@ -686,6 +695,36 @@ try {
     elseif ($uri === '/api/ai/help' && $method === 'POST') {
         $controller = new AIController();
         $controller->getSystemHelp($user);
+    }
+    
+    // ── Walk-in routes ──
+    elseif ($uri === '/api/walk-in/consultation' && $method === 'POST') {
+        $controller = new WalkInController();
+        $controller->consultation($user);
+    }
+    elseif ($uri === '/api/walk-in/lab-tests' && $method === 'POST') {
+        $controller = new WalkInController();
+        $controller->labTests($user);
+    }
+    elseif ($uri === '/api/walk-in/lab-tests/existing' && $method === 'POST') {
+        $controller = new WalkInController();
+        $controller->labTestsExisting($user);
+    }
+    elseif ($uri === '/api/walk-in/lab-catalog' && $method === 'GET') {
+        $controller = new WalkInController();
+        $controller->labCatalog($user);
+    }
+    elseif ($uri === '/api/walk-in/pharmacy' && $method === 'POST') {
+        $controller = new WalkInController();
+        $controller->pharmacy($user);
+    }
+    elseif ($uri === '/api/walk-in/pharmacy/existing' && $method === 'POST') {
+        $controller = new WalkInController();
+        $controller->pharmacyExisting($user);
+    }
+    elseif ($uri === '/api/walk-in/med-catalog' && $method === 'GET') {
+        $controller = new WalkInController();
+        $controller->medicationCatalog($user);
     }
     
     // 404 Not Found

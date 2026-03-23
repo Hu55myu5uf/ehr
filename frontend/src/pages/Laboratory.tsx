@@ -65,6 +65,7 @@ const LAB_TESTS = [
 
 export default function Laboratory() {
     const [pendingOrders, setPendingOrders] = useState<LabOrder[]>([]);
+    const [awaitingPaymentOrders, setAwaitingPaymentOrders] = useState<LabOrder[]>([]);
     const [completedOrders, setCompletedOrders] = useState<LabOrder[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -95,7 +96,7 @@ export default function Laboratory() {
 
     const [isWalkInModalOpen, setIsWalkInModalOpen] = useState(false);
 
-    const [activeTab, setActiveTab] = useState<'pending' | 'invoicing' | 'completed'>('invoicing');
+    const [activeTab, setActiveTab] = useState<'pending' | 'invoicing' | 'awaiting_payment' | 'completed'>('invoicing');
 
     // Track selected batch key for the detail panel
     const [selectedBatchKey, setSelectedBatchKey] = useState<string | null>(null);
@@ -138,11 +139,13 @@ export default function Laboratory() {
     const fetchOrders = async () => {
         try {
             setLoading(true);
-            const [pendingRes, completedRes] = await Promise.all([
+            const [pendingRes, awaitingRes, completedRes] = await Promise.all([
                 api.get('/labs/orders/pending'),
+                api.get('/labs/orders/awaiting-payment'),
                 api.get('/labs/orders/completed')
             ]);
             setPendingOrders(pendingRes.data.orders || []);
+            setAwaitingPaymentOrders(awaitingRes.data.orders || []);
             setCompletedOrders(completedRes.data.orders || []);
         } catch (err: any) {
             console.error('Failed to fetch orders', err);
@@ -204,19 +207,42 @@ export default function Laboratory() {
         }
     };
 
-    const handleWalkInSuccess = async (patientData: any) => {
+    const handleWalkInSuccess = async (result: any) => {
         try {
-            setIsOrdering(true);
-            const res = await api.post('/api/patients/walk-in', patientData);
-            setSelectedPatient(res.data);
-            setIsWalkInModalOpen(false);
-            setIsOrderModalOpen(true);
+            if (result.service_type === 'lab_only') {
+                // Lab-only walk-in: bill already generated, refresh orders
+                setIsWalkInModalOpen(false);
+                fetchOrders();
+                if (result.bill) {
+                    setGeneratedBill(result.bill);
+                    setShowInvoiceModal(true);
+                }
+            } else {
+                // Consultation walk-in: register + create encounter via API
+                setIsOrdering(true);
+                const res = await api.post('/walk-in/consultation', {
+                    first_name: result.first_name,
+                    last_name: result.last_name,
+                    gender: result.gender,
+                    date_of_birth: result.date_of_birth,
+                    chief_complaint: result.chief_complaint || 'Walk-in consultation',
+                    provider_id: result.provider_id
+                });
+                setIsWalkInModalOpen(false);
+                
+                if (res.data?.bill) {
+                    setGeneratedBill(res.data.bill);
+                    setShowInvoiceModal(true);
+                }
+                fetchOrders();
+            }
         } catch (err: any) {
-            alert(err.response?.data?.error || 'Failed to register walk-in patient');
+            alert(err.response?.data?.error || 'Failed to process walk-in');
         } finally {
             setIsOrdering(false);
         }
     };
+
 
     const handleStatusUpdate = async (id: string, status: string) => {
         try {
@@ -296,7 +322,7 @@ export default function Laboratory() {
     const groupOrders = (orders: LabOrder[]): LabBatchGroup[] => {
         const groups: Record<string, LabBatchGroup> = {};
         orders.forEach(o => {
-            const key = o.batch_id || o.id;
+            const key = o.patient_id;
             if (!groups[key]) {
                 groups[key] = {
                     key,
@@ -361,12 +387,20 @@ export default function Laboratory() {
                     Invoicing
                 </button>
                 <button
+                    onClick={() => setActiveTab('awaiting_payment')}
+                    className={`px-6 py-2 rounded-xl text-[13px] font-bold transition-all whitespace-nowrap ${activeTab === 'awaiting_payment'
+                        ? 'bg-white dark:bg-slate-800 text-brand-600 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    Awaiting Payment
+                </button>
+                <button
                     onClick={() => setActiveTab('pending')}
                     className={`px-6 py-2 rounded-xl text-[13px] font-bold transition-all whitespace-nowrap ${activeTab === 'pending'
                         ? 'bg-white dark:bg-slate-800 text-brand-600 shadow-sm'
                         : 'text-slate-500 hover:text-slate-700'}`}
                 >
-                    Laboratory Queue
+                    Lab Work
                 </button>
                 <button
                     onClick={() => setActiveTab('completed')}
@@ -423,7 +457,7 @@ export default function Laboratory() {
                                     {(() => {
                                         const patBatches: Record<string, any[]> = {};
                                         patientOrders.forEach((o: any) => {
-                                            const k = o.batch_id || o.id;
+                                            const k = o.patient_id;
                                             if (!patBatches[k]) patBatches[k] = [];
                                             patBatches[k].push(o);
                                         });
@@ -491,6 +525,58 @@ export default function Laboratory() {
                         ) : (
                             <div className="py-20 text-center bg-slate-100 dark:bg-slate-800/30 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800">
                                 <p className="text-slate-500">No pending test orders found.</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'awaiting_payment' && (
+                    <div className="lg:col-span-3 space-y-6">
+                        {loading ? (
+                            <div className="py-20 flex flex-col items-center justify-center gap-3">
+                                <Loader2 className="w-10 h-10 text-brand-500 animate-spin" />
+                                <p className="text-sm text-slate-400 font-medium tracking-wide">Syncing records...</p>
+                            </div>
+                        ) : awaitingPaymentOrders.length === 0 ? (
+                            <div className="bg-white dark:bg-slate-900/40 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800 p-20 text-center">
+                                <Clock className="w-12 h-12 text-slate-200 dark:text-slate-800 mx-auto mb-4" />
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">No orders awaiting payment</h3>
+                                <p className="text-sm text-slate-500 font-medium">Invoiced tests will appear here until cleared by billing.</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                {(() => {
+                                    const awaitBatches: Record<string, any[]> = {};
+                                    awaitingPaymentOrders.forEach((o: any) => {
+                                        const k = o.patient_id;
+                                        if (!awaitBatches[k]) awaitBatches[k] = [];
+                                        awaitBatches[k].push(o);
+                                    });
+                                    return Object.values(awaitBatches).map((items: any[]) => (
+                                        <div key={items[0].patient_id} className="bg-white dark:bg-slate-900/40 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                                            <div className="flex items-center gap-3 mb-4">
+                                                <div className="w-10 h-10 rounded-full bg-amber-50 dark:bg-amber-500/10 flex items-center justify-center text-amber-500">
+                                                    <Clock className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase truncate max-w-[140px]">{items[0].patient_first} {items[0].patient_last}</h4>
+                                                    <p className="text-[10px] text-slate-500 font-mono tracking-tighter">{items[0].mrn}</p>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-1.5 mb-4">
+                                                {items.map(t => (
+                                                    <div key={t.id} className="flex items-center justify-between text-[11px] font-bold text-slate-600 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-800/30 px-3 py-1.5 rounded-lg">
+                                                        <span>{t.test_name}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
+                                                <span className="text-[9px] font-black uppercase text-amber-600">Waiting for Billing</span>
+                                                <span className="text-[10px] text-slate-400 font-medium">{new Date(items[0].ordered_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                            </div>
+                                        </div>
+                                    ));
+                                })()}
                             </div>
                         )}
                     </div>
@@ -657,8 +743,9 @@ export default function Laboratory() {
                 )}
 
                 {activeTab === 'completed' && (
-                    <>
-                        <div className="lg:col-span-2 space-y-4">
+                    <div className="lg:col-span-3">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            <div className="space-y-4">
                             <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                                 <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                                 Order History
@@ -740,9 +827,10 @@ export default function Laboratory() {
                                 </div>
                             )}
                         </div>
-                    </>
-                )}
-            </div>
+                    </div>
+                </div>
+            )}
+        </div>
 
 
             {showResultForm && selectedOrder && (
@@ -1011,6 +1099,7 @@ export default function Laboratory() {
                 onClose={() => setIsWalkInModalOpen(false)}
                 onSuccess={handleWalkInSuccess}
                 title="Walk-in Lab Order"
+                mode="lab_only"
             />
         </div>
     );

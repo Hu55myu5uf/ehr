@@ -41,7 +41,8 @@ class EncounterService
             FROM encounters e
             JOIN patients p ON e.patient_id = p.id
             JOIN providers pr ON e.provider_id = pr.id
-            WHERE {$whereStr}
+            LEFT JOIN appointments a ON e.id = a.encounter_id
+            WHERE {$whereStr} AND (a.id IS NULL OR a.status != 'pending_payment')
             ORDER BY e.encounter_date DESC
             LIMIT {$limit} OFFSET {$offset}
         ");

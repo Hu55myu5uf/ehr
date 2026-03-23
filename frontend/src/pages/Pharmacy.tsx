@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Pill, Refrigerator, Search, AlertTriangle, Clock, CheckCircle2, Loader2, Package, ArrowRight, MinusCircle, X, Plus, Save, Trash2, Printer } from 'lucide-react';
+import { Pill, Refrigerator, Search, AlertTriangle, Clock, CheckCircle2, Loader2, Package, ArrowRight, MinusCircle, X, Plus, Save, Trash2, Printer, UserPlus } from 'lucide-react';
 import api from '../api/client';
 import InvoiceModal from '../components/InvoiceModal';
+import WalkInModal from '../components/WalkInModal';
 
 interface Prescription {
     id: string;
@@ -17,6 +18,7 @@ interface Prescription {
     prescription_status: string;
     billing_status: string;
     batch_id: string | null;
+    quantity: number;
     created_at: string;
 }
 
@@ -44,11 +46,13 @@ export default function Pharmacy() {
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [generatedBill, setGeneratedBill] = useState<any>(null);
     const [selectedBatch, setSelectedBatch] = useState<BatchGroup | null>(null);
-    const [activeTab, setActiveTab] = useState<'pending' | 'patients' | 'inventory' | 'history'>('patients');
+    const [activeTab, setActiveTab] = useState<'pending' | 'patients' | 'awaiting_payment' | 'inventory' | 'history'>('patients');
     const [inventory, setInventory] = useState<any[]>([]);
     const [loadingInventory, setLoadingInventory] = useState(false);
+    const [awaitingPaymentPrescriptions, setAwaitingPaymentPrescriptions] = useState<Prescription[]>([]);
     const [historyPrescriptions, setHistoryPrescriptions] = useState<Prescription[]>([]);
     const [loadingHistory, setLoadingHistory] = useState(false);
+    const [isWalkInModalOpen, setIsWalkInModalOpen] = useState(false);
     const [newStockItem, setNewStockItem] = useState({ item_name: '', brand_name: '', category: '', quantity: 0, unit: 'Tabs', unit_price: 0 });
 
     const userStr = localStorage.getItem('user');
@@ -60,8 +64,21 @@ export default function Pharmacy() {
         if (activeTab === 'pending') fetchPrescriptions();
         if (activeTab === 'inventory') fetchInventory();
         if (activeTab === 'patients') fetchAllPendingInvoices();
+        if (activeTab === 'awaiting_payment') fetchAwaitingPayment();
         if (activeTab === 'history') fetchHistory();
     }, [activeTab]);
+
+    const fetchAwaitingPayment = async () => {
+        try {
+            setLoading(true);
+            const res = await api.get('/pharmacy/orders/awaiting-payment');
+            setAwaitingPaymentPrescriptions(res.data.prescriptions || []);
+        } catch (err) {
+            console.error('Failed to fetch awaiting payment prescriptions', err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const fetchAllPendingInvoices = async () => {
         try {
@@ -204,11 +221,20 @@ export default function Pharmacy() {
         p.mrn.toLowerCase().includes(search.toLowerCase())
     );
 
+    const handleWalkInSuccess = (result: any) => {
+        setIsWalkInModalOpen(false);
+        if (result.bill) {
+            setGeneratedBill(result.bill);
+            setShowInvoiceModal(true);
+        }
+        fetchAllPendingInvoices();
+    };
+
     // Group prescriptions by batch_id (or individual id if no batch)
     const groupedRx: BatchGroup[] = (() => {
         const groups: Record<string, BatchGroup> = {};
         filteredRx.forEach(rx => {
-            const key = rx.batch_id || rx.id;
+            const key = rx.patient_id;
             if (!groups[key]) {
                 groups[key] = {
                     key,
@@ -234,6 +260,13 @@ export default function Pharmacy() {
                     <p className="text-slate-500 dark:text-slate-400 mt-1">Dispensing and prescription management system</p>
                 </div>
                 <div className="flex gap-3">
+                    <button
+                        onClick={() => setIsWalkInModalOpen(true)}
+                        className="bg-brand-600 hover:bg-brand-500 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-brand-600/20"
+                    >
+                        <UserPlus className="w-5 h-5" />
+                        Walk-in Pharmacy
+                    </button>
                 </div>
             </div>
 
@@ -246,10 +279,16 @@ export default function Pharmacy() {
                         Invoicing
                     </button>
                     <button
+                        onClick={() => setActiveTab('awaiting_payment')}
+                        className={`px-4 py-2 rounded-lg text-[13px] font-bold transition-all whitespace-nowrap ${activeTab === 'awaiting_payment' ? 'bg-white dark:bg-slate-700 text-brand-600 dark:text-brand-400 shadow-sm' : 'text-slate-500'}`}
+                    >
+                        Awaiting Payment
+                    </button>
+                    <button
                         onClick={() => setActiveTab('pending')}
                         className={`px-4 py-2 rounded-lg text-[13px] font-bold transition-all whitespace-nowrap ${activeTab === 'pending' ? 'bg-white dark:bg-slate-700 text-brand-600 dark:text-brand-400 shadow-sm' : 'text-slate-500'}`}
                     >
-                        Dispensing Queue
+                        Paid Invoices
                     </button>
                     <button
                         onClick={() => setActiveTab('inventory')}
@@ -280,10 +319,16 @@ export default function Pharmacy() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-6">
+                    {activeTab === 'awaiting_payment' && (
+                        <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                            <Clock className="w-5 h-5 text-amber-500" />
+                            Awaiting Payment
+                        </h2>
+                    )}
                     {activeTab === 'pending' && (
                         <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                            <Clock className="w-5 h-5 text-brand-500" />
-                            Dispensing Queue
+                            <Pill className="w-5 h-5 text-brand-500" />
+                            Paid Invoices
                         </h2>
                     )}
                     {activeTab === 'inventory' && (
@@ -295,12 +340,12 @@ export default function Pharmacy() {
                     {activeTab === 'patients' && (
                         <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                             <Search className="w-5 h-5 text-brand-500" />
-                            Patient Lookup
+                            Patient Lookup (Invoicing)
                         </h2>
                     )}
                     {activeTab === 'history' && (
                         <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                            <Clock className="w-5 h-5 text-brand-500" />
+                            <Clock className="w-5 h-5 text-emerald-500" />
                             Dispensing History
                         </h2>
                     )}
@@ -354,12 +399,68 @@ export default function Pharmacy() {
                                             {batch.items.map(med => (
                                                 <div key={med.id} className="flex items-center justify-between px-3 py-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
                                                     <span className="text-xs font-bold text-slate-900 dark:text-white uppercase">{med.medication_name}</span>
-                                                    <span className="text-[10px] text-slate-400">{med.dosage} • {med.frequency}</span>
+                                                    <span className="text-[10px] text-slate-400">{med.dosage} • {med.frequency} • Qty: {med.quantity}</span>
                                                 </div>
                                             ))}
                                         </div>
                                     </div>
                                 ))}
+                            </div>
+                        )
+                    )}
+
+
+                    {activeTab === 'awaiting_payment' && (
+                        loading ? (
+                            <div className="py-20 flex flex-col items-center justify-center bg-white dark:bg-slate-900/40 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800">
+                                <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
+                            </div>
+                        ) : awaitingPaymentPrescriptions.length === 0 ? (
+                            <div className="py-20 flex flex-col items-center justify-center bg-white dark:bg-slate-900/40 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800">
+                                <Clock className="w-12 h-12 text-slate-200 dark:text-slate-800 opacity-20" />
+                                <p className="mt-4 text-slate-500">No prescriptions awaiting payment.</p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+                                {(() => {
+                                    const awaitGroups: Record<string, any[]> = {};
+                                    awaitingPaymentPrescriptions.forEach(rx => {
+                                        const key = rx.patient_id;
+                                        if(!awaitGroups[key]) awaitGroups[key] = [];
+                                        awaitGroups[key].push(rx);
+                                    });
+                                    return Object.entries(awaitGroups).map(([batchKey, items]) => (
+                                        <div
+                                            key={batchKey}
+                                            className="p-5 rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/40 shadow-sm"
+                                        >
+                                            <div className="flex items-start justify-between mb-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                                                        <Clock className="w-5 h-5" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-bold text-slate-900 dark:text-white uppercase truncate max-w-[140px]">{items[0].patient_first} {items[0].patient_last}</h4>
+                                                        <p className="text-[10px] text-slate-500 font-mono tracking-tighter">{items[0].mrn}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-[10px] font-black uppercase text-amber-500 bg-amber-500/10 px-2 py-1 rounded-lg">Awaiting Payment</div>
+                                            </div>
+                                            <div className="space-y-1.5 mb-2">
+                                                {items.map(t => (
+                                                    <div key={t.id} className="flex items-center justify-between text-[11px] font-bold text-slate-600 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-800/30 px-3 py-1.5 rounded-lg">
+                                                        <span>{t.medication_name}</span>
+                                                        <span className="text-[10px] text-slate-400 font-mono">{t.dosage}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+                                                <span className="text-[10px] text-slate-400 font-medium">Invoiced on {new Date(items[0].created_at).toLocaleDateString()}</span>
+                                                <span className="text-[10px] text-slate-400 font-medium">{new Date(items[0].created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                            </div>
+                                        </div>
+                                    ));
+                                })()}
                             </div>
                         )
                     )}
@@ -415,7 +516,7 @@ export default function Pharmacy() {
                                             // Group patient prescriptions by batch_id
                                             const patientBatches: Record<string, any[]> = {};
                                             patientPrescriptions.forEach((rx: any) => {
-                                                const key = rx.batch_id || rx.id;
+                                                const key = rx.patient_id;
                                                 if (!patientBatches[key]) patientBatches[key] = [];
                                                 patientBatches[key].push(rx);
                                             });
@@ -471,7 +572,7 @@ export default function Pharmacy() {
                                                                 <div key={med.id} className="flex items-center justify-between px-3 py-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
                                                                     <span className="text-xs font-bold text-slate-900 dark:text-white uppercase">{med.medication_name}</span>
                                                                     <div className="text-right">
-                                                                        <span className="text-[10px] text-slate-400">{med.dosage} • {med.frequency}</span>
+                                                                        <span className="text-[10px] text-slate-400">{med.dosage} • {med.frequency} • Qty: {med.quantity}</span>
                                                                         <span className="text-[10px] font-mono text-slate-500 ml-2">{med.current_inventory_price ? `₦${parseFloat(med.current_inventory_price).toLocaleString()}` : ''}</span>
                                                                     </div>
                                                                 </div>
@@ -734,6 +835,14 @@ export default function Pharmacy() {
                 isOpen={showInvoiceModal}
                 onClose={() => setShowInvoiceModal(false)}
                 bill={generatedBill}
+            />
+
+            <WalkInModal 
+                isOpen={isWalkInModalOpen}
+                onClose={() => setIsWalkInModalOpen(false)}
+                onSuccess={handleWalkInSuccess}
+                title="Walk-in Pharmacy Order"
+                mode="pharmacy_only"
             />
         </div>
     );

@@ -126,6 +126,32 @@ class LabController
     }
 
     /**
+     * Get lab orders awaiting payment
+     * GET /api/labs/orders/awaiting-payment
+     */
+    public function listAwaitingPayment(object $user): void
+    {
+        // Only roles that can manage billing or lab attendants should access this
+        if (!Roles::hasPermission($user->role, 'manage_billing') && $user->role !== Roles::LAB_ATTENDANT) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden: Insufficient permissions']);
+            return;
+        }
+
+        try {
+            $orders = $this->labService->getAwaitingPaymentLabOrders();
+            http_response_code(200);
+            echo json_encode([
+                'count' => count($orders),
+                'orders' => $orders
+            ]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Failed to fetch awaiting payment orders']);
+        }
+    }
+
+    /**
      * Get lab orders for a patient
      * GET /api/labs/orders/patient/{id}
      */

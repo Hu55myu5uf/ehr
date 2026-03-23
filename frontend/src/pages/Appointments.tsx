@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import api from '../api/client';
 import WalkInModal from '../components/WalkInModal';
+import InvoiceModal from '../components/InvoiceModal';
 
 interface Appointment {
     id: string;
@@ -48,6 +49,8 @@ export default function Appointments() {
     const userStr = localStorage.getItem('user');
     const user = userStr && userStr !== 'undefined' ? JSON.parse(userStr) : null;
     const [loading, setLoading] = useState(true);
+    const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+    const [generatedBill, setGeneratedBill] = useState<any>(null);
     const [showModal, setShowModal] = useState(false);
     const [patients, setPatients] = useState<Patient[]>([]);
     const [providers, setProviders] = useState<Provider[]>([]);
@@ -118,21 +121,39 @@ export default function Appointments() {
         }
     };
 
-    const handleWalkInSuccess = async (patientData: any) => {
+    const handleWalkInSuccess = async (result: any) => {
         try {
             setSubmitting(true);
-            const res = await api.post('/api/encounters/walk-in', patientData);
-            const newEncounter = res.data;
-            setIsWalkInModalOpen(false);
             
-            // Navigate to consultation or refresh list
-            if (newEncounter.id) {
-                navigate(`/consultations?id=${newEncounter.id}`);
-            } else {
+            if (result.service_type === 'consultation') {
+                // Walk-in consultation: register + create encounter via API
+                const res = await api.post('/walk-in/consultation', {
+                    first_name: result.first_name,
+                    last_name: result.last_name,
+                    gender: result.gender,
+                    date_of_birth: result.date_of_birth,
+                    chief_complaint: result.chief_complaint || 'Walk-in consultation',
+                    provider_id: result.provider_id
+                });
+                setIsWalkInModalOpen(false);
+                
+                if (res.data?.bill) {
+                    setGeneratedBill(res.data.bill);
+                    setShowInvoiceModal(true);
+                }
+                
+                fetchAppointments();
+            } else if (result.service_type === 'lab_only' || result.service_type === 'pharmacy_only') {
+                // Already processed by modal, but we still want to show the invoice
+                setIsWalkInModalOpen(false);
+                if (result.bill) {
+                    setGeneratedBill(result.bill);
+                    setShowInvoiceModal(true);
+                }
                 fetchAppointments();
             }
         } catch (err: any) {
-            alert(err.response?.data?.error || 'Failed to create walk-in encounter');
+            alert(err.response?.data?.error || 'Failed to create walk-in');
         } finally {
             setSubmitting(false);
         }
@@ -155,6 +176,7 @@ export default function Appointments() {
 
     const statusColors: Record<string, string> = {
         scheduled: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+        pending_payment: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 animate-pulse',
         checked_in: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
         in_progress: 'bg-brand-500/10 text-brand-600 dark:text-brand-400',
         completed: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
@@ -281,10 +303,15 @@ export default function Appointments() {
                                 {apt.status === 'checked_in' && (
                                     <button
                                         onClick={() => updateStatus(apt.id, 'in_progress')}
-                                        className="text-xs bg-brand-500/10 text-brand-600 hover:bg-brand-500/20 px-3 py-1.5 rounded-lg font-semibold transition-all opacity-0 group-hover:opacity-100"
+                                        className="text-xs bg-brand-500/10 text-brand-600 hover:bg-brand-500/20 px-3 py-1.5 rounded-lg font-semibold transition-all"
                                     >
                                         Start
                                     </button>
+                                )}
+                                {apt.status === 'pending_payment' && (
+                                    <span className="text-[10px] font-black text-rose-500 bg-rose-50 dark:bg-rose-500/5 px-2 py-1 rounded-md border border-rose-500/20">
+                                        PAYMENT REQUIRED
+                                    </span>
                                 )}
                             </div>
                         </div>
@@ -451,6 +478,13 @@ export default function Appointments() {
                 onClose={() => setIsWalkInModalOpen(false)}
                 onSuccess={handleWalkInSuccess}
                 title="Immediate Walk-in Appointment"
+                mode="consultation"
+            />
+
+            <InvoiceModal 
+                isOpen={showInvoiceModal}
+                onClose={() => setShowInvoiceModal(false)}
+                bill={generatedBill}
             />
         </div>
     );

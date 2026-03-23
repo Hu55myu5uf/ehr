@@ -121,4 +121,26 @@ class ProviderService
         $provider = $this->getProviderByUserId($userId);
         return $provider ? $provider['id'] : null;
     }
+
+    /**
+     * Get the first available provider ID (fallback for walk-ins when a non-provider user creates encounter)
+     */
+    public function getDefaultProviderId(): ?string
+    {
+        try {
+            $stmt = $this->db->prepare("
+                SELECT p.id FROM providers p
+                JOIN users u ON p.user_id = u.id
+                WHERE p.deleted_at IS NULL AND u.is_active = 1 AND u.role = 'doctor'
+                ORDER BY p.created_at ASC
+                LIMIT 1
+            ");
+            $stmt->execute();
+            $result = $stmt->fetchColumn();
+            return $result ?: null;
+        } catch (\Exception $e) {
+            error_log("Failed to get default provider: " . $e->getMessage());
+            return null;
+        }
+    }
 }
