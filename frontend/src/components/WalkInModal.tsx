@@ -15,6 +15,9 @@ interface CatalogItem {
     name: string;
     price: number;
     category: string;
+    brand?: string;
+    available_qty?: number;
+    inventory_item_id?: number | string;
 }
 
 export default function WalkInModal({ isOpen, onClose, onSuccess, title = "Walk-in Registration", mode = 'select', existingPatientId }: WalkInModalProps) {
@@ -43,7 +46,7 @@ export default function WalkInModal({ isOpen, onClose, onSuccess, title = "Walk-
             if (mode !== 'select') {
                 setServiceType(mode as any);
                 setStep(existingPatientId ? 'items' : 'details');
-                if (mode === 'consultation' || mode === 'select') fetchProviders();
+                if (mode === 'consultation') fetchProviders();
             } else {
                 setServiceType('consultation');
                 setStep('service');
