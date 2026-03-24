@@ -5,15 +5,6 @@
  * Place this file in: backend/public/index.php
  */
 
-// Enable CORS for Plan A hosting
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
-
-if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-    http_response_code(200);
-    exit;
-}
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
@@ -66,19 +57,11 @@ register_shutdown_function(function() use ($auditMiddleware) {
 error_reporting($_ENV['APP_DEBUG'] === 'true' ? E_ALL : 0);
 ini_set('display_errors', $_ENV['APP_DEBUG'] === 'true' ? '1' : '0');
 
-// CORS Headers
-$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-$allowedStr = $_ENV['CORS_ALLOWED_ORIGINS'] ?? '';
-$allowedOrigins = $allowedStr ? explode(',', $allowedStr) : [];
-
-if (in_array($origin, $allowedOrigins) || $allowedStr === '*') {
-    header('Access-Control-Allow-Origin: ' . $origin);
-} else {
-    // Default to first allowed or *
-    header('Access-Control-Allow-Origin: ' . ($allowedOrigins[0] ?? '*'));
-}
+// Flexible CORS Headers for Vercel <-> InfinityFree
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
+header('Access-Control-Allow-Origin: ' . $origin);
 header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
 header('Access-Control-Allow-Credentials: true');
 header('Access-Control-Max-Age: 86400');
 

@@ -1,0 +1,13 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  
+  # Ignore the /public/ directory so backend API still works
+  RewriteCond %{REQUEST_URI} ^/public/ [NC]
+  RewriteRule ^ - [L]
+  
+  # Ensure all React router navigations fall back to index.html
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^ index.html [QSA,L]
+</IfModule>
