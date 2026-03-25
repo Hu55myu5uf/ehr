@@ -3,7 +3,7 @@
 -- Date: 2026-03-23
 -- ================================================
 
-USE ehrecords;
+
 
 -- 1. Add 'pending_payment' to appointment status ENUM
 ALTER TABLE appointments 

@@ -27,15 +27,15 @@ CREATE TABLE IF NOT EXISTS inventory (
 -- 2. Update MEDICATIONS table
 -- Link to inventory and update billing workflow statuses
 ALTER TABLE medications 
-    ADD COLUMN IF NOT EXISTS inventory_item_id CHAR(36) NULL AFTER rxnorm_code,
+    ADD COLUMN inventory_item_id CHAR(36) NULL AFTER rxnorm_code,
     MODIFY COLUMN prescription_status ENUM('pending', 'active', 'dispensed', 'discontinued', 'expired', 'cancelled') DEFAULT 'pending',
-    ADD COLUMN IF NOT EXISTS billing_status ENUM('pending_invoice', 'invoiced', 'paid', 'approved', 'rejected') DEFAULT 'pending_invoice' AFTER prescription_status,
+    ADD COLUMN billing_status ENUM('pending_invoice', 'invoiced', 'paid', 'approved', 'rejected') DEFAULT 'pending_invoice' AFTER prescription_status,
     ADD CONSTRAINT fk_medication_inventory FOREIGN KEY (inventory_item_id) REFERENCES inventory(id) ON DELETE SET NULL;
 
 -- 3. Update BILLS and BILL_ITEMS if needed
 -- (The existing bill_items already has reference_id and item_type)
 -- Ensure reference_id index for performance
-ALTER TABLE bill_items ADD INDEX IF NOT EXISTS idx_reference_id (reference_id);
+ALTER TABLE bill_items ADD INDEX idx_reference_id (reference_id);
 
 -- 4. Seed some initial inventory items if table was empty
 INSERT IGNORE INTO inventory (id, item_name, brand_name, category, quantity, unit, unit_price) VALUES

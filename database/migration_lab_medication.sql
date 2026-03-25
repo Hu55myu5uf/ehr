@@ -80,7 +80,7 @@ SET @preparedStatement = (SELECT IF(
      ADD COLUMN dispensed_at TIMESTAMP NULL AFTER dispensed_by,
      ADD COLUMN refills_authorized INT DEFAULT 0 AFTER instructions,
      ADD COLUMN refills_remaining INT DEFAULT 0 AFTER refills_authorized,
-     ADD COLUMN prescription_status ENUM("pending", "active", "dispensed", "discontinued", "expired") DEFAULT "pending" AFTER is_active,
+     ADD COLUMN prescription_status ENUM(\'pending\', \'active\', \'dispensed\', \'discontinued\', \'expired\') DEFAULT \'pending\' AFTER is_active,
      ADD COLUMN discontinuation_reason TEXT NULL,
      ADD FOREIGN KEY (prescribed_by) REFERENCES providers(id) ON DELETE SET NULL,
      ADD FOREIGN KEY (dispensed_by) REFERENCES users(id) ON DELETE SET NULL'
