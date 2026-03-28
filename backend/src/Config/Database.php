@@ -57,28 +57,21 @@ class Database
                 $username = trim($_ENV['DB_USER'] ?? 'avnadmin');
                 $password = trim($_ENV['DB_PASS'] ?? '');
 
-                // --- UNIVERSAL DSN CONNECTOR ---
-                // Format: host:port is often preferred on Linux PDO
-                $dsn = "mysql:host={$host}:{$port};dbname={$dbname};charset=utf8mb4";
+                // --- DIAGNOSTIC: Remove port to see if syntax error goes away ---
+                $dsn = "mysql:host={$host};dbname={$dbname}";
 
                 try {
-                    error_log("EHR: Trying DSN [ $dsn ]");
+                    error_log("EHR DIAGNOSTIC Trying DSN: $dsn");
                     self::$connection = new PDO($dsn, $username, $password, [
                         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                         PDO::ATTR_EMULATE_PREPARES => false,
                         PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
                     ]);
-                    error_log("EHR: SUCCESS with DSN [ $dsn ]");
                     return self::$connection;
                 } catch (PDOException $e) {
-                    error_log("EHR: FAILED DSN [ $dsn ] | Error: " . $e->getMessage());
-                    // Final fallback without port
-                    $dsn_fallback = "mysql:host={$host};dbname={$dbname};charset=utf8mb4";
-                    self::$connection = new PDO($dsn_fallback, $username, $password, [
-                        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    ]);
-                    return self::$connection;
+                    error_log("EHR DIAGNOSTIC FAILED DSN: $dsn | Error: " . $e->getMessage());
+                    throw $e;
                 }
 
             } catch (\Exception $e) {
