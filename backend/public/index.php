@@ -133,13 +133,19 @@ try {
     }
 
     if ($uri === '/api/health' && $method === 'GET') {
-        // One-time seed for admin if table is empty
+        // Improved seed for admin (Search for specific user)
         try {
             $db = \App\Config\Database::getInstance()->getConnection();
-            $count = $db->query("SELECT COUNT(*) FROM users")->fetchColumn();
-            if ($count == 0) {
+            $adminUser = $db->query("SELECT id FROM users WHERE username = 'admin'")->fetch();
+            
+            if (!$adminUser) {
+                // Create admin if not exists
                 $passHash = password_hash('password', PASSWORD_BCRYPT);
-                $db->exec("INSERT INTO users (id, username, email, password_hash, role, is_active) VALUES (UUID(), 'admin', 'admin@ehr.com', '$passHash', 'super_admin', 1)");
+                $db->exec("INSERT INTO users (id, username, email, password_hash, role, is_active) 
+                           VALUES (UUID(), 'admin', 'admin@ehr.com', '$passHash', 'super_admin', 1)");
+                error_log("EHR: Created default admin account.");
+            } else {
+                error_log("EHR: Admin account already exists.");
             }
         } catch (\Exception $e) {
             error_log("Seed failed: " . $e->getMessage());
