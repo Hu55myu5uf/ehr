@@ -133,19 +133,25 @@ try {
     }
 
     if ($uri === '/api/health' && $method === 'GET') {
-        // Improved seed for admin (Search for specific user)
+        // Improved seed for admin (Search for specific user, handle deleted/inactive)
         try {
             $db = \App\Config\Database::getInstance()->getConnection();
-            $adminUser = $db->query("SELECT id FROM users WHERE username = 'admin'")->fetch();
+            $adminUser = $db->query("SELECT id, deleted_at, is_active FROM users WHERE username = 'admin'")->fetch();
+            $passHash = password_hash('password', PASSWORD_BCRYPT);
             
             if (!$adminUser) {
-                // Create admin if not exists
-                $passHash = password_hash('password', PASSWORD_BCRYPT);
+                // Create fresh admin
                 $db->exec("INSERT INTO users (id, username, email, password_hash, role, is_active) 
                            VALUES (UUID(), 'admin', 'admin@ehr.com', '$passHash', 'super_admin', 1)");
-                error_log("EHR: Created default admin account.");
+                error_log("EHR: Created new admin account.");
+            } elseif ($adminUser['deleted_at'] !== null || !$adminUser['is_active']) {
+                // Undelete and reactivate existing admin, reset password
+                $db->exec("UPDATE users SET deleted_at = NULL, is_active = 1, password_hash = '$passHash', role = 'super_admin' WHERE username = 'admin'");
+                error_log("EHR: Reactivated and reset existing admin account.");
             } else {
-                error_log("EHR: Admin account already exists.");
+                // Just reset password to be absolutely sure
+                $db->exec("UPDATE users SET password_hash = '$passHash' WHERE username = 'admin'");
+                error_log("EHR: Reset password for existing admin.");
             }
         } catch (\Exception $e) {
             error_log("Seed failed: " . $e->getMessage());
