@@ -28,24 +28,42 @@ class Database
     {
         if (self::$connection === null) {
             try {
-                $host = $_ENV['DB_HOST'] ?? 'localhost';
-                $port = $_ENV['DB_PORT'] ?? '3306';
-                $dbname = $_ENV['DB_NAME'] ?? 'ehr_system';
-                $username = $_ENV['DB_USER'] ?? 'root';
-                $password = $_ENV['DB_PASS'] ?? '';
+                $host = trim($_ENV['DB_HOST'] ?? 'localhost');
+                $port = trim($_ENV['DB_PORT'] ?? '3306');
+                
+                // Robust: Handle if host already contains a port (e.g. host:3306)
+                if (strpos($host, ':') !== false) {
+                    $parts = explode(':', $host);
+                    $host = trim($parts[0]);
+                    $port = trim($parts[1]);
+                }
 
-                $dsn = "mysql:host={$host};port={$port};dbname={$dbname};charset=utf8mb4";
+                // Final sanitization: Remove anything that isn't a number from port
+                $port = preg_replace('/[^0-9]/', '', $port);
+                $dbname = trim($_ENV['DB_NAME'] ?? 'defaultdb');
+                $username = trim($_ENV['DB_USER'] ?? 'avnadmin');
+                $password = trim($_ENV['DB_PASS'] ?? '');
+
+                // Standard DSN Format for MySQL 8
+                $dsn = "mysql:host={$host}";
+                if (!empty($port) && (int)$port > 0 && (int)$port <= 65535) {
+                    $dsn .= ";port=" . (int)$port;
+                }
+                $dsn .= ";dbname={$dbname};charset=utf8mb4";
+
+                error_log("DEBUG EHR: Connecting [ " . $dsn . " ]");
 
                 self::$connection = new PDO($dsn, $username, $password, [
                     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                     PDO::ATTR_EMULATE_PREPARES => false,
-                    PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"
+                    // SSL is often required for Aiven
+                    PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
                 ]);
 
             } catch (PDOException $e) {
-                error_log("Database Connection Error: " . $e->getMessage());
-                throw new \RuntimeException("Could not connect to database: " . $e->getMessage());
+                error_log("CRITICAL EHR Connection Failed: " . $e->getMessage() . " | DSN: " . ($dsn ?? 'N/A'));
+                throw new \RuntimeException("Database Error: " . $e->getMessage());
             }
         }
 

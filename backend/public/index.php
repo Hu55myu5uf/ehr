@@ -127,11 +127,23 @@ try {
     }
 
     if ($uri === '/api/health' && $method === 'GET') {
+        // One-time seed for admin if table is empty
+        try {
+            $db = \App\Config\Database::getInstance()->getConnection();
+            $count = $db->query("SELECT COUNT(*) FROM users")->fetchColumn();
+            if ($count == 0) {
+                $passHash = password_hash('password', PASSWORD_BCRYPT);
+                $db->exec("INSERT INTO users (id, username, email, password_hash, role, is_active) VALUES (UUID(), 'admin', 'admin@ehr.com', '$passHash', 'super_admin', 1)");
+            }
+        } catch (\Exception $e) {
+            error_log("Seed failed: " . $e->getMessage());
+        }
+
         header('Content-Type: application/json');
         echo json_encode([
             'status' => 'healthy',
             'timestamp' => date('c'),
-            'version' => '1.0.0'
+            'version' => '1.1.1-HEARTBEAT'
         ]);
         exit;
     }
