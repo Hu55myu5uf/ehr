@@ -57,32 +57,28 @@ class Database
                 $password = trim($_ENV['DB_PASS'] ?? '');
 
                 // --- UNIVERSAL DSN CONNECTOR ---
-                $formats = [
-                    "mysql:host={$host};port={$port};dbname={$dbname};charset=utf8mb4",
-                    "mysql:host={$host}:{$port};dbname={$dbname};charset=utf8mb4",
-                    "mysql:host={$host};dbname={$dbname}" // Fallback to default port
-                ];
+                // Format: host:port is often preferred on Linux PDO
+                $dsn = "mysql:host={$host}:{$port};dbname={$dbname};charset=utf8mb4";
 
-                $lastError = '';
-                foreach ($formats as $dsn) {
-                    try {
-                        error_log("EHR: Trying DSN [ $dsn ]");
-                        self::$connection = new PDO($dsn, $username, $password, [
-                            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                            PDO::ATTR_EMULATE_PREPARES => false,
-                            PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
-                        ]);
-                        error_log("EHR: SUCCESS with DSN [ $dsn ]");
-                        return self::$connection;
-                    } catch (PDOException $e) {
-                        $lastError = $e->getMessage();
-                        error_log("EHR: FAILED DSN [ $dsn ] | Error: $lastError");
-                        continue;
-                    }
+                try {
+                    error_log("EHR: Trying DSN [ $dsn ]");
+                    self::$connection = new PDO($dsn, $username, $password, [
+                        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                        PDO::ATTR_EMULATE_PREPARES => false,
+                        PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
+                    ]);
+                    error_log("EHR: SUCCESS with DSN [ $dsn ]");
+                    return self::$connection;
+                } catch (PDOException $e) {
+                    error_log("EHR: FAILED DSN [ $dsn ] | Error: " . $e->getMessage());
+                    // Final fallback without port
+                    $dsn_fallback = "mysql:host={$host};dbname={$dbname};charset=utf8mb4";
+                    self::$connection = new PDO($dsn_fallback, $username, $password, [
+                        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    ]);
+                    return self::$connection;
                 }
-
-                throw new \RuntimeException("Database Error: All DSN formats failed. Last error: $lastError");
 
             } catch (\Exception $e) {
                 error_log("CRITICAL EHR: " . $e->getMessage());
