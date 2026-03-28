@@ -40,6 +40,18 @@ class Database
 
                 // Final sanitization: Remove anything that isn't a number from port
                 $port = preg_replace('/[^0-9]/', '', $port);
+
+                // Manual DNS Resolution (Fixes "Name or service not known" on Render)
+                if ($host !== 'localhost' && $host !== '127.0.0.1') {
+                    $ip = gethostbyname($host);
+                    if ($ip !== $host) {
+                        error_log("EHR: Resolved {$host} to {$ip}");
+                        $host = $ip;
+                    } else {
+                        error_log("EHR: FAILED to resolve {$host} manually.");
+                    }
+                }
+
                 $dbname = trim($_ENV['DB_NAME'] ?? 'defaultdb');
                 $username = trim($_ENV['DB_USER'] ?? 'avnadmin');
                 $password = trim($_ENV['DB_PASS'] ?? '');
