@@ -56,26 +56,37 @@ class Database
                 $username = trim($_ENV['DB_USER'] ?? 'avnadmin');
                 $password = trim($_ENV['DB_PASS'] ?? '');
 
-                // Standard DSN Format for MySQL 8
-                $dsn = "mysql:host={$host}";
-                if (!empty($port) && (int)$port > 0 && (int)$port <= 65535) {
-                    $dsn .= ";port=" . (int)$port;
+                // --- UNIVERSAL DSN CONNECTOR ---
+                $formats = [
+                    "mysql:host={$host};port={$port};dbname={$dbname};charset=utf8mb4",
+                    "mysql:host={$host}:{$port};dbname={$dbname};charset=utf8mb4",
+                    "mysql:host={$host};dbname={$dbname}" // Fallback to default port
+                ];
+
+                $lastError = '';
+                foreach ($formats as $dsn) {
+                    try {
+                        error_log("EHR: Trying DSN [ $dsn ]");
+                        self::$connection = new PDO($dsn, $username, $password, [
+                            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                            PDO::ATTR_EMULATE_PREPARES => false,
+                            PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
+                        ]);
+                        error_log("EHR: SUCCESS with DSN [ $dsn ]");
+                        return self::$connection;
+                    } catch (PDOException $e) {
+                        $lastError = $e->getMessage();
+                        error_log("EHR: FAILED DSN [ $dsn ] | Error: $lastError");
+                        continue;
+                    }
                 }
-                $dsn .= ";dbname={$dbname};charset=utf8mb4";
 
-                error_log("DEBUG EHR: Connecting [ " . $dsn . " ]");
+                throw new \RuntimeException("Database Error: All DSN formats failed. Last error: $lastError");
 
-                self::$connection = new PDO($dsn, $username, $password, [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    PDO::ATTR_EMULATE_PREPARES => false,
-                    // SSL is often required for Aiven
-                    PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => false,
-                ]);
-
-            } catch (PDOException $e) {
-                error_log("CRITICAL EHR Connection Failed: " . $e->getMessage() . " | DSN: " . ($dsn ?? 'N/A'));
-                throw new \RuntimeException("Database Error: " . $e->getMessage());
+            } catch (\Exception $e) {
+                error_log("CRITICAL EHR: " . $e->getMessage());
+                throw $e;
             }
         }
 
