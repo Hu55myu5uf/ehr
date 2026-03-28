@@ -59,8 +59,9 @@ register_shutdown_function(function() use ($auditMiddleware) {
 });
 
 // Error handling
-error_reporting($_ENV['APP_DEBUG'] === 'true' ? E_ALL : 0);
-ini_set('display_errors', $_ENV['APP_DEBUG'] === 'true' ? '1' : '0');
+$appDebug = ($_ENV['APP_DEBUG'] ?? 'false') === 'true';
+error_reporting($appDebug ? E_ALL : 0);
+ini_set('display_errors', $appDebug ? '1' : '0');
 
 // Flexible CORS Headers for Vercel <-> InfinityFree
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
