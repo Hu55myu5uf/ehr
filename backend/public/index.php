@@ -750,7 +750,8 @@ try {
     header('Content-Type: application/json');
     echo json_encode([
         'error' => 'Internal server error',
-        'message' => $_ENV['APP_DEBUG'] === 'true' ? $e->getMessage() : 'An error occurred'
+        'message' => $e->getMessage(),
+        'debug_info' => 'Check Render Logs for DSN'
     ]);
     error_log("EHR System Error: " . $e->getMessage() . "\n" . $e->getTraceAsString());
 }
