@@ -39,9 +39,14 @@ use App\Controllers\WalletController;
 use App\Controllers\AuditController;
 use App\Controllers\WalkInController;
 
-// Load environment variables
-$dotenv = Dotenv::createImmutable(__DIR__ . '/..');
-$dotenv->load();
+// Load environment variables (Optional for Render)
+if (file_exists(__DIR__ . '/../.env')) {
+    $dotenv = Dotenv::createImmutable(__DIR__ . '/..');
+    $dotenv->load();
+} elseif (file_exists(__DIR__ . '/../../.env')) {
+    $dotenv = Dotenv::createImmutable(__DIR__ . '/../..');
+    $dotenv->load();
+}
 
 // Initialize Audit Middleware globally
 $auditMiddleware = new AuditMiddleware();
