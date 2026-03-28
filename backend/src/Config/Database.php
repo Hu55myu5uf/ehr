@@ -57,11 +57,11 @@ class Database
                 $username = trim($_ENV['DB_USER'] ?? 'avnadmin');
                 $password = trim($_ENV['DB_PASS'] ?? '');
 
-                // --- DIAGNOSTIC: Remove port to see if syntax error goes away ---
-                $dsn = "mysql:host={$host};dbname={$dbname}";
+                // Final DSN using host:port syntax (Robust for Linux/Docker)
+                $dsn = "mysql:host={$host}:{$port};dbname={$dbname};charset=utf8mb4";
 
                 try {
-                    error_log("EHR DIAGNOSTIC Trying DSN: $dsn");
+                    error_log("EHR: Connecting to $dsn");
                     self::$connection = new PDO($dsn, $username, $password, [
                         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -70,7 +70,7 @@ class Database
                     ]);
                     return self::$connection;
                 } catch (PDOException $e) {
-                    error_log("EHR DIAGNOSTIC FAILED DSN: $dsn | Error: " . $e->getMessage());
+                    error_log("EHR: Connection FAILED: " . $e->getMessage());
                     throw $e;
                 }
 
