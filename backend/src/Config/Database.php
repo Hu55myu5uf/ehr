@@ -39,7 +39,8 @@ class Database
                 }
 
                 // Final sanitization: Remove anything that isn't a number from port
-                $port = preg_replace('/[^0-9]/', '', $port);
+                $port = preg_replace('/[^0-9]/', '', (string)$port);
+                error_log("DEBUG EHR: Port [" . $port . "] Hex [" . bin2hex($port) . "]");
 
                 // Manual DNS Resolution (Fixes "Name or service not known" on Render)
                 if ($host !== 'localhost' && $host !== '127.0.0.1') {
