@@ -329,7 +329,7 @@ export default function ConsultationForm({ id: propId, embedded = false }: Consu
 
     const fetchAvailableTests = async () => {
         try {
-            const res = await api.get('/admin/prices');
+            const res = await api.get('/prices');
             const labTests = res.data.filter((p: any) => p.item_type === 'lab_test');
             
             // Group by category
