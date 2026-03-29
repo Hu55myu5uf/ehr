@@ -13,6 +13,7 @@ Thumbs.db
 backend/.env
 backend/vendor/
 backend/cache/
+backend/scripts/
 backend/test_*.php
 backend/php_output.txt
 backend/check_*.php
@@ -37,4 +38,3 @@ database/*.sql.bak
 # Temp
 tmp/
 coverage/
-    
