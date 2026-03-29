@@ -142,6 +142,34 @@ try {
         exit;
     }
 
+    // Temporary diagnostic endpoint - REMOVE AFTER DEBUGGING
+    if ($uri === '/api/debug' && $method === 'GET') {
+        header('Content-Type: application/json');
+        $diag = [
+            'php_version' => PHP_VERSION,
+            'env_vars' => [
+                'DB_HOST' => !empty($_ENV['DB_HOST']) ? 'SET (' . substr($_ENV['DB_HOST'], 0, 10) . '...)' : 'MISSING',
+                'DB_PORT' => $_ENV['DB_PORT'] ?? 'MISSING',
+                'DB_NAME' => $_ENV['DB_NAME'] ?? 'MISSING',
+                'DB_USER' => !empty($_ENV['DB_USER']) ? 'SET' : 'MISSING',
+                'DB_PASS' => !empty($_ENV['DB_PASS']) ? 'SET' : 'MISSING',
+                'JWT_SECRET' => !empty($_ENV['JWT_SECRET']) ? 'SET' : 'MISSING',
+                'ENCRYPTION_KEY' => !empty($_ENV['ENCRYPTION_KEY']) ? 'SET (len=' . strlen($_ENV['ENCRYPTION_KEY'] ?? '') . ')' : 'MISSING',
+                'APP_DEBUG' => $_ENV['APP_DEBUG'] ?? 'MISSING',
+            ],
+            'db_test' => 'pending',
+        ];
+        try {
+            $testDb = \App\Config\Database::getInstance()->getConnection();
+            $count = $testDb->query("SELECT COUNT(*) FROM users")->fetchColumn();
+            $diag['db_test'] = "OK - $count users found";
+        } catch (\Exception $e) {
+            $diag['db_test'] = 'FAILED: ' . $e->getMessage();
+        }
+        echo json_encode($diag, JSON_PRETTY_PRINT);
+        exit;
+    }
+
     // ──────────────────────────────────
     // Protected routes (auth required)
     // ──────────────────────────────────
